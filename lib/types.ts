@@ -19,6 +19,7 @@ export interface Guest {
   created_at?: string;
   updated_at?: string;
   wishes?: string;
+  photo_url?: string;
   event_id?: string;
   user_id?: string;
   last_log?: GuestLog;

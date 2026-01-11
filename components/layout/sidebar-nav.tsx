@@ -13,6 +13,7 @@ import {
   Mail,
   UserCog,
   Sofa,
+  Image as ImageIcon,
 } from "lucide-react";
 
 export function SidebarNav() {
@@ -32,6 +33,7 @@ export function SidebarNav() {
     { href: "/dashboard/seating", icon: Sofa, label: "Seating" },
     { href: "/check-in", icon: ScanLine, label: "Check-in Tool" },
     { href: "/dashboard/invitations", icon: Mail, label: "Invitations" },
+    { href: "/dashboard/guest-book", icon: ImageIcon, label: "Guest Book" },
     { href: "/dashboard/staff", icon: UserCog, label: "Staff Event" },
   ];
 

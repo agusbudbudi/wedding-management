@@ -14,6 +14,7 @@ import { Gift, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { Guest } from "@/lib/types";
 import { toPng } from "html-to-image";
 import { Button } from "@/components/ui/button";
+import { PhotoUpload } from "@/components/features/invitation/photo-upload";
 
 interface GuestInvitationClientProps {
   guest: any;
@@ -189,6 +190,36 @@ export function GuestInvitationClient({
               </div>
             </>
           )}
+
+        {/* Guest Book Photo Section */}
+        {currentGuest.status === "attended" && (
+          <>
+            <Separator className="bg-gray-100" />
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
+              <div className="text-center space-y-2">
+                <h4 className="text-xl font-bold text-gray-900 tracking-tight italic font-serif">
+                  Guest Book Photo
+                </h4>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                  Unggah momen manismu di acara ini
+                </p>
+              </div>
+
+              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50/50 rounded-full blur-3xl -mr-16 -mt-16" />
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-cyan-50/50 rounded-full blur-3xl -ml-16 -mb-16" />
+
+                <PhotoUpload
+                  guestId={currentGuest.id}
+                  initialPhotoUrl={currentGuest.photo_url}
+                  onUploadSuccess={(url) => {
+                    setCurrentGuest((prev) => ({ ...prev, photo_url: url }));
+                  }}
+                />
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Souvenir Redemption Section */}
         {(invitation.metadata as any)?.qr_invitation?.is_active !== false &&

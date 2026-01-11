@@ -10,6 +10,8 @@ create table guests (
   pax_count integer not null default 1,
   status text not null default 'draft', -- 'draft', 'sent', 'viewed', 'confirmed', 'declined'
   phone_number text,
+  wishes text,
+  photo_url text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -39,7 +41,7 @@ CREATE POLICY "Allow guests to update their own RSVP" ON guests
 FOR UPDATE 
 USING (true)
 WITH CHECK (
-  status IN ('confirmed', 'declined')
+  status IN ('confirmed', 'declined') OR photo_url IS NOT NULL
 );
 
 -- Allow authenticated users (admins) all access
