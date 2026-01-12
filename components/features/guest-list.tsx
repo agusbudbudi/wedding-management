@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Edit,
   Trash2,
   ExternalLink,
@@ -30,6 +37,8 @@ import {
   ChevronLeft,
   ChevronRight,
   MoreHorizontal,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -58,6 +67,11 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
+
+  // Deletion state
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const canViewDetail = hasPermission("guest_list", "view");
   const canEdit = hasPermission("guest_list", "edit");
@@ -95,6 +109,21 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
   const goToPage = (page: number) => {
     const pageNumber = Math.max(1, Math.min(page, totalPages));
     setCurrentPage(pageNumber);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      setIsDeleting(true);
+      setDeleteError(null);
+      await supabaseGuestService.deleteGuest(id);
+      toast.success("Guest deleted successfully");
+      onRefresh?.();
+      setDeleteConfirmId(null);
+    } catch (error: any) {
+      setDeleteError(error.message || "Failed to delete guest");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -358,15 +387,8 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
                         variant="ghost"
                         size="icon"
                         title="Delete"
-                        onClick={async () => {
-                          if (
-                            confirm(
-                              `Are you sure you want to delete ${guest.name}?`
-                            )
-                          ) {
-                            await supabaseGuestService.deleteGuest(guest.id);
-                            onRefresh?.();
-                          }
+                        onClick={() => {
+                          setDeleteConfirmId(guest.id);
                         }}
                         className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
                       >
@@ -479,6 +501,69 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!deleteConfirmId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteConfirmId(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md rounded-[2rem] border-none shadow-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">
+              Delete Guest?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-gray-500">
+              Are you sure you want to delete this guest? This action cannot be
+              undone and all associated data (RSVP, etc.) will be permanently
+              removed.
+            </p>
+
+            {deleteError && (
+              <div className="flex gap-2 p-3 rounded-2xl bg-red-50 border border-red-100 text-red-600 animate-in fade-in slide-in-from-top-1 duration-200">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <p className="text-xs font-semibold leading-relaxed">
+                  {deleteError}
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteConfirmId(null);
+                setDeleteError(null);
+              }}
+              className="rounded-xl font-bold"
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+              className="rounded-xl font-bold shadow-lg shadow-red-100"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Guest"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

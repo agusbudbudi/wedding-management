@@ -98,7 +98,7 @@ export default function GuestsPage() {
 
     // Add notification
     supabaseNotificationService.createNotification({
-      title: "Excel Report Downloaded",
+      title: "✅ Excel Report Downloaded",
       message: `Successfully exported guest list for "${eventName}".`,
       type: "info",
     });
@@ -114,7 +114,7 @@ export default function GuestsPage() {
 
     // Add notification
     supabaseNotificationService.createNotification({
-      title: "PDF Summary Downloaded",
+      title: "✅ PDF Summary Downloaded",
       message: `Successfully exported visual summary for "${
         activeEvent?.name || "Wedding Event"
       }".`,

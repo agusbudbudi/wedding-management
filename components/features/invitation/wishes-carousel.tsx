@@ -21,12 +21,33 @@ interface WishesCarouselProps {
   eventId: string;
 }
 
+const cardColors = [
+  "bg-blue-50/70 border-blue-100/50",
+  "bg-purple-50/70 border-purple-100/50",
+  "bg-rose-50/70 border-rose-100/50",
+  "bg-cyan-50/70 border-cyan-100/50",
+  "bg-amber-50/70 border-amber-100/50",
+];
+
 export function WishesCarousel({
   initialWishes,
   eventId,
 }: WishesCarouselProps) {
   const [wishes, setWishes] = useState<Wish[]>(initialWishes);
+  const [expandedIndices, setExpandedIndices] = useState<Set<number>>(
+    new Set()
+  );
   const supabase = createClient();
+
+  const toggleExpand = (index: number) => {
+    const newSet = new Set(expandedIndices);
+    if (newSet.has(index)) {
+      newSet.delete(index);
+    } else {
+      newSet.add(index);
+    }
+    setExpandedIndices(newSet);
+  };
 
   useEffect(() => {
     // Refresh wishes function
@@ -70,70 +91,90 @@ export function WishesCarousel({
   if (!wishes || wishes.length === 0) return null;
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
-      <ScrollArea className="w-full whitespace-nowrap pb-4">
-        <div className="flex w-max space-x-4 px-4 sm:px-8 mb-2">
-          {wishes.map((wish, i) => (
-            <div
-              key={i}
-              className="w-[280px] sm:w-[320px] bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative group whitespace-normal flex flex-col gap-4"
-            >
-              <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10 border border-gray-100 bg-gray-50">
-                  <AvatarFallback className="text-primary font-bold text-xs">
-                    {wish.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase()
-                      .slice(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col">
-                  <span className="font-bold text-gray-900 text-sm line-clamp-1">
-                    {wish.name}
-                  </span>
-                  <span className="text-[10px] text-gray-400">
-                    {wish.updated_at
-                      ? formatDistanceToNow(new Date(wish.updated_at), {
-                          addSuffix: true,
-                          locale: id,
-                        })
-                      : "Baru saja"}
-                  </span>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-300">
+      <ScrollArea className="w-full whitespace-nowrap pb-6">
+        <div className="flex w-max space-x-6 px-4 sm:px-8">
+          {wishes.map((wish, i) => {
+            const isExpanded = expandedIndices.has(i);
+            const bgColorClass = cardColors[i % cardColors.length];
+
+            return (
+              <div
+                key={i}
+                className={`w-[280px] sm:w-[340px] rounded-[2rem] p-5 border ${bgColorClass} transition-all duration-500 relative group whitespace-normal flex flex-col gap-2 overflow-hidden`}
+              >
+                {/* Artistic Background Quote */}
+                <Quote className="absolute -right-4 -bottom-4 w-24 h-24 text-gray-900/[0.03] rotate-12 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-700" />
+
+                <div className="flex items-center gap-4 relative z-10">
+                  <div className="relative">
+                    <Avatar className="h-9 w-9 border-2 border-white bg-white/50 ring-1 ring-black/5">
+                      <AvatarFallback className="text-gray-600 font-bold text-[10px]">
+                        {wish.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-serif italic font-bold text-gray-900 text-[13.5px] line-clamp-1">
+                      {wish.name}
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+                      {wish.updated_at
+                        ? formatDistanceToNow(new Date(wish.updated_at), {
+                            addSuffix: true,
+                            locale: id,
+                          })
+                        : "Baru saja"}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 ml-auto">
+
+                <div className="relative z-10">
+                  <p
+                    className={`text-gray-700 text-[13px] leading-[1.8] italic font-medium transition-all duration-300 ${
+                      !isExpanded ? "line-clamp-2" : ""
+                    }`}
+                  >
+                    "{wish.wishes}"
+                  </p>
+                  {wish.wishes.length > 70 && (
+                    <button
+                      onClick={() => toggleExpand(i)}
+                      className="text-[10px] font-bold text-blue-600/70 hover:text-blue-600 mt-2 uppercase tracking-widest transition-colors flex items-center gap-1"
+                    >
+                      {isExpanded ? "Sembunyikan" : "Selengkapnya"}
+                    </button>
+                  )}
+                </div>
+
+                <div className="mt-auto flex items-center justify-between pt-2 relative z-10">
                   {wish.status && (
                     <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                        wish.status === "confirmed" ||
-                        wish.status === "attended"
-                          ? "bg-green-50 text-green-600 border border-green-100"
-                          : wish.status === "declined"
-                          ? "bg-gray-50 text-gray-500 border border-gray-100"
-                          : "bg-blue-50 text-blue-600 border border-blue-100"
-                      }`}
+                      className={`text-[9px] px-3 py-1 rounded-full font-bold uppercase tracking-[0.1em] bg-white/50 border border-black/5 text-gray-500`}
                     >
                       {wish.status === "confirmed" || wish.status === "attended"
-                        ? "Hadir"
+                        ? "Hadir di sini"
                         : wish.status === "declined"
-                        ? "Tidak Hadir"
+                        ? "Mendoakan"
                         : wish.status}
                     </span>
                   )}
-                  <Quote className="w-5 h-5 text-primary/10" />
+                  <div className="flex gap-1 opacity-20">
+                    <div className="w-1 h-1 bg-gray-900 rounded-full" />
+                    <div className="w-1 h-1 bg-gray-900 rounded-full" />
+                    <div className="w-1 h-1 bg-gray-900 rounded-full" />
+                  </div>
                 </div>
               </div>
-
-              <div className="flex-1">
-                <p className="text-gray-600 text-xs leading-relaxed italic line-clamp-4">
-                  "{wish.wishes}"
-                </p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-        <ScrollBar orientation="horizontal" />
+        <ScrollBar orientation="horizontal" className="h-1.5" />
       </ScrollArea>
     </div>
   );

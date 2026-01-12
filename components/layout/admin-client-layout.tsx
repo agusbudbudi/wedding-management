@@ -275,7 +275,7 @@ export function AdminClientLayout({ children, user }: AdminClientLayoutProps) {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-auto p-8">
-          <div className="max-w-7xl mx-auto space-y-8">{children}</div>
+          <div className="max-w-[1600px] mx-auto space-y-8">{children}</div>
         </div>
       </main>
     </div>

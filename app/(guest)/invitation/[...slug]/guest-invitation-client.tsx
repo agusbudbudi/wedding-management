@@ -107,19 +107,29 @@ export function GuestInvitationClient({
                 {(invitation.metadata as any)?.rsvp?.guest_name_label ||
                   "Tamu Undangan"}
               </p>
-              <div className="bg-gray-50/50 p-8 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden group">
+              <div className="bg-gradient-to-br from-white via-blue-50/30 to-purple-50/20 p-10 rounded-[2.5rem] border-2 border-white shadow-[0_15px_50px_rgba(0,0,0,0.03)] relative overflow-hidden group transition-all duration-500 hover:shadow-[0_20px_60px_rgba(0,0,0,0.06)]">
+                {/* Background Decorations */}
+                <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-48 h-48 bg-blue-100/20 rounded-full blur-3xl opacity-50 transition-transform duration-1000 group-hover:scale-125" />
+                <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 w-48 h-48 bg-purple-100/20 rounded-full blur-3xl opacity-50 transition-transform duration-1000 group-hover:scale-125" />
+
+                {/* Light Sweep Effect */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000">
+                  <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-[1500ms] ease-in-out bg-gradient-to-r from-transparent via-white/50 to-transparent skew-x-[-20deg]" />
+                </div>
+
                 <div className="relative z-10">
-                  <h3 className="text-3xl font-serif font-bold text-gray-900 italic">
+                  <h3 className="text-3xl sm:text-4xl font-serif font-bold text-gray-900 italic tracking-tight">
                     {guest.name}
                   </h3>
-                  <p className="text-gray-500 text-sm mt-3 leading-relaxed">
+                  <div className="w-12 h-0.5 bg-blue-200/50 my-4 rounded-full" />
+                  <p className="text-gray-500 text-sm leading-relaxed max-w-[280px] mx-auto sm:max-w-none">
                     {(invitation.metadata as any)?.rsvp?.description ||
                       "Merupakan suatu kehormatan bagi kami apabila Bapak/Ibu/Saudara/i berkenan hadir pada acara kami."}
                   </p>
                 </div>
                 {/* Subtle decorative icons */}
-                <div className="absolute -right-4 -bottom-4 text-gray-100 group-hover:text-blue-50 transition-colors">
-                  <Sparkles className="w-16 h-16" />
+                <div className="absolute -right-2 -bottom-2 text-blue-200/20 group-hover:text-blue-200/40 transition-all duration-700 group-hover:scale-110 group-hover:-rotate-12">
+                  <Sparkles className="w-20 h-20" />
                 </div>
               </div>
             </div>
@@ -195,7 +205,7 @@ export function GuestInvitationClient({
         {currentGuest.status === "attended" && (
           <>
             <Separator className="bg-gray-100" />
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-1000">
               <div className="text-center space-y-2">
                 <h4 className="text-xl font-bold text-gray-900 tracking-tight italic font-serif">
                   Guest Book Photo
@@ -205,18 +215,14 @@ export function GuestInvitationClient({
                 </p>
               </div>
 
-              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50/50 rounded-full blur-3xl -mr-16 -mt-16" />
-                <div className="absolute bottom-0 left-0 w-32 h-32 bg-cyan-50/50 rounded-full blur-3xl -ml-16 -mb-16" />
-
-                <PhotoUpload
-                  guestId={currentGuest.id}
-                  initialPhotoUrl={currentGuest.photo_url}
-                  onUploadSuccess={(url) => {
-                    setCurrentGuest((prev) => ({ ...prev, photo_url: url }));
-                  }}
-                />
-              </div>
+              <PhotoUpload
+                guestId={currentGuest.id}
+                guestName={currentGuest.name}
+                initialPhotoUrl={currentGuest.photo_url}
+                onUploadSuccess={(url) => {
+                  setCurrentGuest((prev) => ({ ...prev, photo_url: url }));
+                }}
+              />
             </div>
           </>
         )}
@@ -242,13 +248,13 @@ export function GuestInvitationClient({
                   {/* Main Ticket Container */}
                   <div
                     ref={voucherRef}
-                    className="relative bg-white rounded-3xl border border-blue-200"
+                    className="relative bg-white rounded-3xl border border-blue-100/50"
                   >
                     {/* Top Section: QR Code */}
-                    <div className="relative bg-gradient-to-br from-blue-600 to-cyan-500 p-8 text-center rounded-t-[1.4rem]">
+                    <div className="relative bg-gradient-to-br from-blue-50 to-cyan-50/50 p-8 text-center rounded-t-[1.4rem]">
                       {/* Left and Right "Notches" for Ticket Effect */}
-                      <div className="absolute -left-[1px] top-full -translate-y-1/2 w-3 h-6 bg-white rounded-r-full border-t border-r border-b border-blue-200 z-10" />
-                      <div className="absolute -right-[1px] top-full -translate-y-1/2 w-3 h-6 bg-white rounded-l-full border-t border-l border-b border-blue-200 z-10" />
+                      <div className="absolute -left-[1px] top-full -translate-y-1/2 w-3 h-6 bg-white rounded-r-full border-t border-r border-b border-blue-100/50 z-10" />
+                      <div className="absolute -right-[1px] top-full -translate-y-1/2 w-3 h-6 bg-white rounded-l-full border-t border-l border-b border-blue-100/50 z-10" />
 
                       <div className="inline-block p-4 bg-white rounded-2xl shadow-sm border border-gray-100 relative">
                         {currentGuest.status === "souvenir_delivered" && (

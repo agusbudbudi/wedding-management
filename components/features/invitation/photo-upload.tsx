@@ -9,12 +9,14 @@ import Image from "next/image";
 
 interface PhotoUploadProps {
   guestId: string;
+  guestName: string;
   initialPhotoUrl?: string;
   onUploadSuccess: (url: string) => void;
 }
 
 export function PhotoUpload({
   guestId,
+  guestName,
   initialPhotoUrl,
   onUploadSuccess,
 }: PhotoUploadProps) {
@@ -98,34 +100,57 @@ export function PhotoUpload({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="relative group">
+    <div className="space-y-6">
+      <div className="relative group w-full">
         {photoUrl ? (
-          <div className="relative aspect-square w-full max-w-[200px] mx-auto overflow-hidden rounded-2xl border-4 border-white shadow-xl">
-            <Image
-              src={photoUrl}
-              alt="Guest photo"
-              fill
-              className="object-cover"
-            />
-            <button
-              onClick={removePhoto}
-              className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-sm transition-all"
-            >
-              <X className="w-4 h-4" />
-            </button>
+          <div className="space-y-6">
+            <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[2.5rem] border-8 border-white shadow-[0_20px_50px_rgba(0,0,0,0.1)] ring-1 ring-gray-100 group-hover:scale-[1.01] transition-all duration-500">
+              <Image
+                src={photoUrl}
+                alt="Guest photo"
+                fill
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <button
+                onClick={removePhoto}
+                className="absolute top-4 right-4 p-2.5 bg-white/90 hover:bg-white text-red-500 rounded-2xl shadow-xl backdrop-blur-md transition-all z-20"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="text-center space-y-2 animate-in fade-in slide-in-from-top-2 duration-700 delay-300">
+              <p className="text-sm font-medium text-gray-900">
+                Terima kasih,{" "}
+                <span className="font-bold text-blue-600">{guestName}</span>!
+              </p>
+              <p className="text-[11px] text-gray-500 leading-relaxed max-w-[240px] mx-auto font-medium">
+                Foto ini akan dimasukkan ke dalam{" "}
+                <span className="italic font-serif">Guest Book Photo</span>{" "}
+                spesial untuk kedua mempelai.
+              </p>
+            </div>
           </div>
         ) : (
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="aspect-square w-full max-w-[200px] mx-auto rounded-3xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-gray-100 hover:border-gray-300 transition-all duration-300"
+            className="aspect-[4/3] w-full rounded-[2.5rem] border-2 border-dashed border-gray-100 bg-gray-50/50 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-blue-50/30 hover:border-blue-200 transition-all duration-500 group relative overflow-hidden"
           >
-            <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-gray-400">
-              <Camera className="w-6 h-6" />
+            {/* Background decorative elements */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100/30 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-blue-200/40 transition-colors" />
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-cyan-100/30 rounded-full blur-3xl -ml-16 -mb-16 group-hover:bg-cyan-200/40 transition-colors" />
+
+            <div className="w-16 h-16 bg-white rounded-3xl shadow-sm border border-gray-100 flex items-center justify-center text-gray-400 group-hover:text-blue-500 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 relative z-10">
+              <Camera className="w-8 h-8" />
             </div>
-            <div className="text-center">
-              <p className="text-sm font-bold text-gray-900">Upload Foto</p>
-              <p className="text-[10px] text-gray-400">Ambil momen bahagiamu</p>
+            <div className="text-center relative z-10">
+              <p className="text-base font-bold text-gray-900">
+                Ketuk untuk Foto
+              </p>
+              <p className="text-[11px] text-gray-400 font-medium">
+                Bagi kebahagiaanmu di sini
+              </p>
             </div>
           </div>
         )}
@@ -147,7 +172,7 @@ export function PhotoUpload({
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="text-primary font-bold hover:bg-primary/5"
+            className="text-primary font-bold hover:bg-primary/5 rounded-full px-6 py-5 transition-all active:scale-95"
           >
             {isUploading ? (
               <>
@@ -157,7 +182,7 @@ export function PhotoUpload({
             ) : (
               <>
                 <Upload className="w-4 h-4 mr-2" />
-                Pilih File
+                Pilih Dari Galeri
               </>
             )}
           </Button>

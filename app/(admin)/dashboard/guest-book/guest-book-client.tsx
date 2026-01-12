@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import Image from "next/image";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { supabaseNotificationService } from "@/lib/services/notification-service";
 
 export function GuestBookClient() {
   const [guests, setGuests] = useState<Guest[]>([]);
@@ -38,6 +39,8 @@ export function GuestBookClient() {
   const [previewPages, setPreviewPages] = useState<any[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeEvent, setActiveEvent] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchGuests();
@@ -101,6 +104,33 @@ export function GuestBookClient() {
     }
   };
 
+  const handleDeletePhoto = async (id: string) => {
+    try {
+      setIsDeleting(true);
+      const supabase = createClient() as any;
+
+      const { error } = await supabase
+        .from("guests")
+        .update({ photo_url: null, wishes: null })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setGuests((prev) => prev.filter((g) => g.id !== id));
+      setSelectedIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+      toast.success("Guest book photo and wishes deleted successfully");
+    } catch (error: any) {
+      toast.error("Failed to delete guest book photo");
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmId(null);
+    }
+  };
+
   const generatePDF = async () => {
     const selectedGuests = guests.filter((g) => selectedIds.has(g.id));
     if (selectedGuests.length === 0) {
@@ -111,12 +141,9 @@ export function GuestBookClient() {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 10; // Narrow margin
+    const margin = 10;
     const columnGap = 2;
     const colWidth = (pageWidth - margin * 2 - columnGap) / 2;
-
-    const pagesData: { cards: any[]; header: any }[] = [];
-    let currentCards: any[] = [];
 
     const getHeader = () => ({
       title: activeEvent?.name || "Our Wedding",
@@ -127,7 +154,6 @@ export function GuestBookClient() {
 
     const headerData = getHeader();
 
-    // PDF Header rendering
     const renderPDFHeader = (d: any) => {
       d.setFontSize(20);
       d.setTextColor(30, 41, 59);
@@ -152,32 +178,15 @@ export function GuestBookClient() {
       d.line(margin, 28, pageWidth - margin, 28);
     };
 
-    renderPDFHeader(doc);
-
-    let yLeft = 40;
-    let yRight = 40;
-
-    for (let i = 0; i < selectedGuests.length; i++) {
-      const guest = selectedGuests[i];
-      const isLeft = yLeft <= yRight;
-      const currentX = isLeft ? margin : margin + colWidth + columnGap;
-      let currentY = isLeft ? yLeft : yRight;
-
-      // Render Card to Canvas with precise integer dimensions to avoid stretching
+    // Card Generation Helper
+    const createCardData = async (guest: Guest) => {
       const pixelRatio = 4;
       const canvasWidth = Math.ceil(colWidth * pixelRatio);
-
-      const cardCanvas = document.createElement("canvas");
-      const ctx = cardCanvas.getContext("2d");
-      if (!ctx) continue;
-
-      // Preliminary text measurements
       const dummyCanvas = document.createElement("canvas");
       const dummyCtx = dummyCanvas.getContext("2d")!;
       const fontSizeName = 6 * pixelRatio;
       const fontSizeWishes = 5.5 * pixelRatio;
 
-      // Photo loading and ratio
       let img: HTMLImageElement | null = null;
       let imgHeight = 0;
       const photoHPadding = 4 * pixelRatio;
@@ -200,7 +209,6 @@ export function GuestBookClient() {
               img!.onload = resolve;
               img!.onerror = reject;
             });
-
             const ratio = img.height / img.width;
             imgHeight = photoW * ratio;
           }
@@ -209,7 +217,6 @@ export function GuestBookClient() {
         }
       }
 
-      // Wrap text
       const wrapText = (text: string, font: string, maxWidth: number) => {
         dummyCtx.font = font;
         const words = text.split(" ");
@@ -239,31 +246,26 @@ export function GuestBookClient() {
         ? wrapText(guest.wishes!, wishFont, textMaxWidth)
         : [];
 
-      // Calculate card height precisely - Reduced padding
       const contentPadding = 2 * pixelRatio;
       const verticalGap = 2 * pixelRatio;
 
       let calculatedHeight = contentPadding;
       if (img) calculatedHeight += imgHeight + verticalGap;
       calculatedHeight += nameLines.length * (fontSizeName * 1.15);
-
       if (hasWishes) {
-        calculatedHeight += 2 * pixelRatio; // gap between name and wishes
+        calculatedHeight += 2 * pixelRatio;
         calculatedHeight += wishLines.length * (fontSizeWishes * 1.15);
       }
-
       calculatedHeight += contentPadding;
 
+      const cardCanvas = document.createElement("canvas");
       cardCanvas.width = canvasWidth;
       cardCanvas.height = Math.ceil(calculatedHeight);
-
-      // Draw Card - Clean & Borderless
+      const ctx = cardCanvas.getContext("2d")!;
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, cardCanvas.width, cardCanvas.height);
 
       let drawY = contentPadding;
-
-      // Image
       if (img) {
         const drawX = photoHPadding;
         const imgRadius = 3 * pixelRatio;
@@ -276,7 +278,6 @@ export function GuestBookClient() {
         drawY += imgHeight + verticalGap;
       }
 
-      // Name
       ctx.fillStyle = "#1e293b";
       ctx.font = nameFont;
       ctx.textBaseline = "top";
@@ -285,7 +286,6 @@ export function GuestBookClient() {
         drawY += fontSizeName * 1.15;
       }
 
-      // Wishes (only if provided)
       if (hasWishes) {
         drawY += 2 * pixelRatio;
         ctx.fillStyle = "#64748b";
@@ -297,53 +297,136 @@ export function GuestBookClient() {
         }
       }
 
-      // Add to PDF with exactly the same aspect ratio as Canvas
-      const finalCardWidth = colWidth;
-      const finalCardHeight = cardCanvas.height / pixelRatio;
+      return {
+        id: guest.id,
+        img: cardCanvas.toDataURL("image/jpeg", 0.9),
+        width: colWidth,
+        height: cardCanvas.height / pixelRatio,
+      };
+    };
 
-      // Check for page break
-      if (currentY + finalCardHeight > pageHeight - margin) {
-        pagesData.push({ cards: [...currentCards], header: headerData });
-        currentCards = [];
+    // Pre-calculate all cards
+    const allCards = await Promise.all(selectedGuests.map(createCardData));
+
+    // Sort cards by height descending (optional but helps with packing)
+    // However, user said currently it's based on dashboard sort.
+    // Let's keep the order flexible but implement the greedy fit.
+
+    const pagesData: { cards: any[]; header: any }[] = [];
+    let unplacedCards = [...allCards];
+    const topMargin = 40;
+    const maxContentHeight = pageHeight - margin - topMargin;
+
+    while (unplacedCards.length > 0) {
+      if (pagesData.length > 0) {
         doc.addPage();
-        renderPDFHeader(doc);
-        yLeft = 40;
-        yRight = 40;
-        currentY = 40;
+      }
+      renderPDFHeader(doc);
+
+      const currentPageCards: any[] = [];
+
+      // Fill Left Column
+      let yLeft = topMargin;
+      let i = 0;
+      while (i < unplacedCards.length) {
+        const card = unplacedCards[i];
+        if (yLeft + card.height <= pageHeight - margin) {
+          const currentX = margin;
+          const currentY = yLeft;
+
+          doc.addImage(
+            card.img,
+            "JPEG",
+            currentX,
+            currentY,
+            card.width,
+            card.height,
+            undefined,
+            "FAST"
+          );
+          currentPageCards.push({
+            ...card,
+            x: currentX,
+            y: currentY,
+            w: card.width,
+            h: card.height,
+          });
+
+          yLeft += card.height + columnGap;
+          unplacedCards.splice(i, 1);
+          // Keep i the same since we spliced
+        } else {
+          i++;
+        }
       }
 
-      const cardImg = cardCanvas.toDataURL("image/jpeg", 0.9);
-      doc.addImage(
-        cardImg,
-        "JPEG",
-        currentX,
-        currentY,
-        finalCardWidth,
-        finalCardHeight,
-        undefined,
-        "FAST"
-      );
+      // Fill Right Column
+      let yRight = topMargin;
+      i = 0;
+      while (i < unplacedCards.length) {
+        const card = unplacedCards[i];
+        if (yRight + card.height <= pageHeight - margin) {
+          const currentX = margin + colWidth + columnGap;
+          const currentY = yRight;
 
-      currentCards.push({
-        img: cardImg,
-        x: currentX,
-        y: currentY,
-        w: finalCardWidth,
-        h: finalCardHeight,
+          doc.addImage(
+            card.img,
+            "JPEG",
+            currentX,
+            currentY,
+            card.width,
+            card.height,
+            undefined,
+            "FAST"
+          );
+          currentPageCards.push({
+            ...card,
+            x: currentX,
+            y: currentY,
+            w: card.width,
+            h: card.height,
+          });
+
+          yRight += card.height + columnGap;
+          unplacedCards.splice(i, 1);
+        } else {
+          i++;
+        }
+      }
+
+      pagesData.push({
+        cards: currentPageCards,
+        header: headerData,
       });
 
-      // Update column heights
-      if (isLeft) {
-        yLeft += finalCardHeight + columnGap;
-      } else {
-        yRight += finalCardHeight + columnGap;
+      // Avoid infinite loop if a card is too big for a single page
+      if (currentPageCards.length === 0 && unplacedCards.length > 0) {
+        console.error("Card too tall for page", unplacedCards[0]);
+        // Force place it even if it overflows, or skip?
+        // Best to place it and let it overflow rather than infinite loop.
+        const card = unplacedCards.shift()!;
+        const currentX = margin;
+        const currentY = topMargin;
+        doc.addImage(
+          card.img,
+          "JPEG",
+          currentX,
+          currentY,
+          card.width,
+          card.height,
+          undefined,
+          "FAST"
+        );
+        currentPageCards.push({
+          ...card,
+          x: currentX,
+          y: currentY,
+          w: card.width,
+          h: card.height,
+        });
+        pagesData[pagesData.length - 1].cards = currentPageCards;
       }
     }
-
-    pagesData.push({
-      cards: [...currentCards],
-      header: headerData,
-    });
 
     return { doc, pagesData };
   };
@@ -375,6 +458,16 @@ export function GuestBookClient() {
         }-${new Date().getTime()}.pdf`
       );
       toast.success("PDF downloaded successfully");
+
+      // Add system notification
+      await supabaseNotificationService.createNotification({
+        title: " 🎉 Guest Book Downloaded",
+        message: `Your guest book PDF for ${
+          activeEvent?.name || "your wedding"
+        } has been successfully downloaded.`,
+        type: "info",
+        link: "/dashboard/guest-book",
+      });
     } catch (error: any) {
       console.error("PDF Export Error:", error);
       toast.error("Failed to generate PDF: " + error.message);
@@ -479,6 +572,20 @@ export function GuestBookClient() {
                     onCheckedChange={() => toggleSelect(guest.id)}
                     className="bg-white/80 backdrop-blur-sm shadow-sm"
                   />
+                </div>
+
+                <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="w-8 h-8 rounded-lg shadow-lg"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteConfirmId(guest.id);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
 
                 {/* Photo Preview */}
@@ -613,6 +720,54 @@ export function GuestBookClient() {
                   ))}
               </div>
             </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!deleteConfirmId}
+        onOpenChange={(open) => !open && setDeleteConfirmId(null)}
+      >
+        <DialogContent className="max-w-md rounded-[2rem] border-none shadow-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">
+              Delete Guest Book Photo?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-gray-500">
+              Are you sure you want to delete this photo and the associated
+              wishes? This action cannot be undone and will also remove them
+              from the guest's invitation page.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmId(null)}
+              className="rounded-xl font-bold"
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                deleteConfirmId && handleDeletePhoto(deleteConfirmId)
+              }
+              className="rounded-xl font-bold shadow-lg shadow-red-100"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Photo"
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

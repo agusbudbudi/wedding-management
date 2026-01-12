@@ -11,6 +11,7 @@ import {
   MapPin,
   CheckCircle2,
   Loader2,
+  AlertCircle,
   ArrowRight,
   Trash2,
   Shield,
@@ -24,6 +25,12 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
 import { AddEventDialog } from "@/components/features/add-event-dialog";
 import { createClient } from "@/lib/supabase/client";
@@ -39,6 +46,9 @@ export default function EventsPage() {
   );
   const [loading, setLoading] = useState(true);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -78,16 +88,10 @@ export default function EventsPage() {
     }
   }
 
-  async function handleDelete(e: React.MouseEvent, id: string) {
-    e.stopPropagation();
-    if (
-      !confirm(
-        "Are you sure you want to delete this event? This action cannot be undone."
-      )
-    )
-      return;
-
+  async function handleDelete(id: string) {
     try {
+      setIsDeleting(true);
+      setDeleteError(null);
       await supabaseEventService.deleteEvent(id);
       toast.success("Event deleted successfully");
       loadEvents();
@@ -96,8 +100,11 @@ export default function EventsPage() {
         setActiveEventId(null);
         window.dispatchEvent(new Event("active-event-changed"));
       }
+      setDeleteConfirmId(null);
     } catch (error: any) {
-      toast.error(error.message || "Failed to delete event");
+      setDeleteError(error.message || "Failed to delete event");
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -256,7 +263,10 @@ export default function EventsPage() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                      onClick={(e) => handleDelete(e, event.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteConfirmId(event.id);
+                      }}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -312,6 +322,68 @@ export default function EventsPage() {
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!deleteConfirmId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteConfirmId(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md rounded-[2rem] border-none shadow-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">
+              Delete Event?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-gray-500">
+              Are you sure you want to delete this event? This action cannot be
+              undone and all associated data will be permanently removed.
+            </p>
+
+            {deleteError && (
+              <div className="flex gap-2 p-3 rounded-2xl bg-red-50 border border-red-100 text-red-600 animate-in fade-in slide-in-from-top-1 duration-200">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <p className="text-xs font-semibold leading-relaxed">
+                  {deleteError}
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteConfirmId(null);
+                setDeleteError(null);
+              }}
+              className="rounded-xl font-bold"
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+              className="rounded-xl font-bold shadow-lg shadow-red-100"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Event"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

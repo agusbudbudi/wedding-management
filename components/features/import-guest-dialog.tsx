@@ -271,7 +271,7 @@ export function ImportGuestDialog({
         // Trigger system notification
         if (localSuccessCount > 0) {
           await supabaseNotificationService.createNotification({
-            title: "Guest Import Successful",
+            title: "✅ Guest Import Successful",
             message: `Successfully imported ${localSuccessCount} guests to ${
               event?.name || "your event"
             }.`,
@@ -285,7 +285,7 @@ export function ImportGuestDialog({
           });
         } else if (localErrorCount > 0) {
           await supabaseNotificationService.createNotification({
-            title: "Guest Import Failed",
+            title: "❌ Guest Import Failed",
             message: `Attempted to import guests to ${
               event?.name || "your event"
             } but all rows failed.`,

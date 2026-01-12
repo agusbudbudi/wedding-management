@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Guest } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import QRCode from "react-qr-code";
 import { supabaseGuestService } from "@/lib/services/guest-service";
-import { CheckCircle2, Download, X } from "lucide-react";
+import { CheckCircle2, Download, X, Loader2 } from "lucide-react";
+import { toPng } from "html-to-image";
 
 interface RSVPFormProps {
   guest: Guest;
@@ -34,34 +35,32 @@ export function RSVPForm({
   const [attending, setAttending] = useState<"yes" | "no" | null>(null);
   const [wishes, setWishes] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  const handleDownload = () => {
-    const svg = document.getElementById("guest-qr-code");
-    if (!svg) return;
+  const handleDownload = useCallback(async () => {
+    if (!cardRef.current) return;
 
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const img = new Image();
+    try {
+      setIsDownloading(true);
+      const dataUrl = await toPng(cardRef.current, {
+        cacheBust: true,
+        backgroundColor: "#fff",
+        pixelRatio: 2, // Higher quality
+      });
 
-    img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      if (ctx) {
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        const pngFile = canvas.toDataURL("image/png");
-
-        const downloadLink = document.createElement("a");
-        downloadLink.download = `invitation-qr-${guest.slug}.png`;
-        downloadLink.href = pngFile;
-        downloadLink.click();
-      }
-    };
-
-    img.src = "data:image/svg+xml;base64," + btoa(svgData);
-  };
+      const link = document.createElement("a");
+      link.download = `tiket-checkin-${guest.name
+        .toLowerCase()
+        .replace(/\s+/g, "-")}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("Failed to download ticket:", err);
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [guest.name]);
 
   const showConfirmed =
     (submitted && attending === "yes") || guest.status === "confirmed";
@@ -71,22 +70,23 @@ export function RSVPForm({
 
   if (showAttended) {
     return (
-      <div className="flex flex-col items-center space-y-6 animate-in fade-in duration-700">
-        <div className="bg-purple-50 text-purple-700 px-6 py-4 rounded-2xl flex items-center gap-3 w-full justify-center border border-purple-100">
+      <div className="flex flex-col items-center space-y-4 animate-in fade-in duration-1000">
+        <div className="bg-purple-50/50 text-purple-700 px-6 py-4 rounded-3xl flex items-center gap-3 w-full justify-center border border-purple-100/50 backdrop-blur-sm">
           <div className="bg-purple-100 p-1 rounded-full">
-            <CheckCircle2 className="w-5 h-5" />
+            <CheckCircle2 className="w-4 h-4" />
           </div>
-          <span className="font-semibold text-sm">
-            Selamat datang! Anda telah melakukan check-in.
+          <span className="font-bold text-xs uppercase tracking-wider">
+            Check-in Berhasil
           </span>
         </div>
-        <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col items-center space-y-4 w-full text-center">
-          <h3 className="font-bold text-xl text-gray-900">
-            Selamat Menikmati Acara!
-          </h3>
-          <p className="text-gray-500 text-sm leading-relaxed">
-            Terima kasih telah bergabung dengan kami, {guest.name}. Kami harap
-            Anda menikmati acaranya!
+
+        <div className="text-center space-y-2 py-4">
+          <p className="text-sm font-medium text-gray-900">
+            Selamat datang, <span className="text-blue-600">{guest.name}</span>!
+          </p>
+          <p className="text-[11px] text-gray-500 leading-relaxed font-medium">
+            Terima kasih telah bergabung dengan kami. Kami harap Anda menikmati
+            setiap momen di acara ini!
           </p>
         </div>
       </div>
@@ -105,10 +105,13 @@ export function RSVPForm({
           </span>
         </div>
 
-        <div className="bg-white p-8 rounded-[2rem] border border-gray-100 flex flex-col items-center space-y-6 w-full">
+        <div
+          ref={cardRef}
+          className="bg-white p-8 rounded-[2rem] border border-gray-100 flex flex-col items-center space-y-6 w-full"
+        >
           <div className="text-center space-y-1">
             <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-bold">
-              Tiket Masuk
+              QR Masuk
             </p>
             <h3 className="font-bold text-xl text-gray-900">{guest.name}</h3>
             <div className="inline-block bg-gray-100 px-3 py-1 rounded-full text-xs font-medium text-gray-600">
@@ -125,23 +128,33 @@ export function RSVPForm({
               />
             </div>
           )}
+          <p className="text-[10px] text-center text-gray-400 max-w-[200px] mx-auto leading-relaxed font-medium uppercase tracking-wider">
+            {isQRActive
+              ? "Silakan tunjukkan kode QR ini di meja penerima tamu untuk check-in."
+              : "Terima kasih atas konfirmasinya. Sampai jumpa di hari H!"}
+          </p>
+        </div>
 
-          <div className="w-full space-y-3">
-            {isQRActive && (
-              <Button
-                className="w-full h-12 rounded-xl bg-[#3EA0FE] hover:bg-blue-600 shadow-lg shadow-blue-500/20 text-white font-medium"
-                onClick={handleDownload}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Unduh Tiket
-              </Button>
-            )}
-            <p className="text-[10px] text-center text-gray-400 max-w-[200px] mx-auto leading-relaxed">
-              {isQRActive
-                ? "Silakan tunjukkan kode QR ini di meja penerima tamu untuk check-in."
-                : "Terima kasih atas konfirmasinya. Sampai jumpa di hari H!"}
-            </p>
-          </div>
+        <div className="w-full">
+          {isQRActive && (
+            <Button
+              className="w-full h-12 rounded-xl bg-[#3EA0FE] hover:bg-blue-600 shadow-lg shadow-blue-500/20 text-white font-bold disabled:opacity-70 transition-all hover:scale-[1.02]"
+              onClick={handleDownload}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Mendownload...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Unduh QR Check-In
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -149,17 +162,23 @@ export function RSVPForm({
 
   if (showDeclined) {
     return (
-      <div className="bg-gray-50 text-gray-500 px-6 py-12 rounded-[2rem] text-center space-y-4 border border-gray-100">
-        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-          <X className="w-8 h-8 text-gray-400" />
+      <div className="flex flex-col items-center space-y-4 animate-in fade-in duration-1000">
+        <div className="bg-gray-50/50 text-gray-500 px-6 py-4 rounded-3xl flex items-center gap-3 w-full justify-center border border-gray-100/50 backdrop-blur-sm">
+          <div className="bg-gray-100 p-1 rounded-full">
+            <X className="w-4 h-4" />
+          </div>
+          <span className="font-bold text-xs uppercase tracking-wider">
+            Konfirmasi Berhasil
+          </span>
         </div>
-        <div className="space-y-1">
-          <p className="font-medium text-gray-900">
+
+        <div className="text-center space-y-2 py-4">
+          <p className="text-sm font-medium text-gray-900">
             Terima kasih telah memberikan kabar
           </p>
-          <p className="text-sm">
-            Kami sangat menyayangkan Anda tidak bisa hadir, namun kami
-            menghargai ucapan Anda.
+          <p className="text-[11px] text-gray-500 leading-relaxed font-medium max-w-[260px] mx-auto">
+            Kami sangat menyayangkan Anda tidak bisa hadir, namun kami sangat
+            menghargai ucapan dan doa yang diberikan.
           </p>
         </div>
       </div>

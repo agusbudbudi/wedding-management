@@ -83,7 +83,7 @@ export function AddTableDialog({ eventId, onSuccess }: AddTableDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button disabled={!eventId}>
+        <Button disabled={!eventId} className="cursor-pointer">
           <Plus className="w-4 h-4 mr-2" />
           Add Table
         </Button>
@@ -141,13 +141,17 @@ export function AddTableDialog({ eventId, onSuccess }: AddTableDialogProps) {
                       defaultValue={field.value}
                     >
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="cursor-pointer">
                           <SelectValue placeholder="Select one" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="round">Round</SelectItem>
-                        <SelectItem value="rect">Rectangular</SelectItem>
+                        <SelectItem value="round" className="cursor-pointer">
+                          Round
+                        </SelectItem>
+                        <SelectItem value="rect" className="cursor-pointer">
+                          Rectangular
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -157,7 +161,11 @@ export function AddTableDialog({ eventId, onSuccess }: AddTableDialogProps) {
             </div>
 
             <DialogFooter>
-              <Button type="submit" disabled={isSubmitting} className="w-full">
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full cursor-pointer"
+              >
                 {isSubmitting && (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 )}
