@@ -21,6 +21,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +36,7 @@ import { redirect } from "next/navigation";
 
 export default function StaffPage() {
   const [staff, setStaff] = useState<EventStaff[]>([]);
+  const [staffToDelete, setStaffToDelete] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const activeEventId =
     typeof window !== "undefined"
@@ -55,10 +62,17 @@ export default function StaffPage() {
     }
   };
 
-  const handleRemove = async (staffId: string) => {
+  const handleRemove = (staffId: string) => {
+    setStaffToDelete(staffId);
+  };
+
+  const confirmRemove = async () => {
+    if (!staffToDelete) return;
+
     try {
-      await supabaseStaffService.removeStaff(staffId);
+      await supabaseStaffService.removeStaff(staffToDelete);
       toast.success("Staff removed successfully");
+      setStaffToDelete(null);
       fetchStaff();
     } catch (error) {
       toast.error("Failed to remove staff");
@@ -219,6 +233,42 @@ export default function StaffPage() {
           <RolesPermissionsTab eventId={activeEventId} />
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!staffToDelete}
+        onOpenChange={(open) => !open && setStaffToDelete(null)}
+      >
+        <DialogContent className="max-w-md rounded-[2rem] border-none shadow-2xl p-6 text-left">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">
+              Remove Staff Member?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-gray-500">
+              Are you sure you want to remove this staff member? They will lose
+              access to this event.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setStaffToDelete(null)}
+              className="rounded-xl font-bold cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmRemove}
+              className="rounded-xl font-bold shadow-lg shadow-red-100 cursor-pointer"
+            >
+              Remove Staff
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

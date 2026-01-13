@@ -45,6 +45,8 @@ import {
   ListFilter,
   XCircle,
   X,
+  Pencil,
+  StickyNote,
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/lib/hooks/use-permissions";
@@ -54,17 +56,21 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { AddTableDialog } from "./add-table-dialog";
 
 interface SeatingBoardProps {
   initialGuests: Guest[];
   initialTables: Table[];
+  onRefresh?: () => void;
 }
 
 export function SeatingBoard({
   initialGuests,
   initialTables,
+  onRefresh,
 }: SeatingBoardProps) {
   const [tables, setTables] = useState(initialTables);
+  const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -80,6 +86,7 @@ export function SeatingBoard({
 
   // Sync state when props change (e.g. after adding a new table)
   useEffect(() => {
+    // We rely on the parent to pass sorted tables.
     setTables(initialTables);
   }, [initialTables]);
 
@@ -453,13 +460,24 @@ export function SeatingBoard({
               );
               const currentPax = assignedGuests
                 .filter((g) => g.status !== "declined")
-                .reduce((acc, g) => acc + g.pax_count, 0);
+                .reduce((acc, g) => {
+                  const isCheckedIn =
+                    g.status === "attended" ||
+                    g.status === "souvenir_delivered";
+                  // If checked in, count actual attended pax (fallback to pax_count if missing)
+                  // If NOT checked in, count invitation pax
+                  const paxToCount = isCheckedIn
+                    ? g.attended_pax || g.pax_count
+                    : g.pax_count;
+                  return acc + paxToCount;
+                }, 0);
+
               const attendedPax = assignedGuests
                 .filter(
                   (g) =>
                     g.status === "attended" || g.status === "souvenir_delivered"
                 )
-                .reduce((acc, g) => acc + g.pax_count, 0);
+                .reduce((acc, g) => acc + (g.attended_pax || g.pax_count), 0);
               const isOverCapacity = currentPax > table.capacity;
               const isFull = currentPax === table.capacity;
 
@@ -480,15 +498,15 @@ export function SeatingBoard({
                   <CardHeader className="pb-4 border-b border-dashed border-gray-100 relative">
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-3">
-                          <CardTitle className="text-lg font-bold text-gray-900 line-clamp-1">
+                        <div>
+                          <h3 className="font-bold text-gray-900 text-lg">
                             {table.name}
-                          </CardTitle>
+                          </h3>
                           <Badge
-                            variant="outline"
-                            className="text-[10px] uppercase tracking-wider font-bold text-gray-400 border-gray-200 px-2 h-5"
+                            variant="secondary"
+                            className="mt-1 text-[10px] uppercase tracking-wider font-bold text-gray-400 bg-white/80 backdrop-blur-sm border-gray-200/50"
                           >
-                            {table.shape}
+                            {table.shape === "rect" ? "Rectangular" : "Round"}
                           </Badge>
                         </div>
                         <p className="text-[10px] font-mono text-gray-400 flex items-center gap-1 uppercase tracking-tight">
@@ -514,16 +532,28 @@ export function SeatingBoard({
                           {currentPax} / {table.capacity}
                         </Badge>
                         {canDeleteTable && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                            onClick={() => {
-                              setDeleteConfirmId(table.id);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              onClick={() => setEditingTable(table)}
+                              title="Edit Table"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              onClick={() => {
+                                setDeleteConfirmId(table.id);
+                              }}
+                              title="Delete Table"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -535,71 +565,106 @@ export function SeatingBoard({
                         </p>
                       </div>
                     )}
+                    {table.notes && (
+                      <div className="mt-3 flex items-start gap-2 bg-gray-50/50 p-2 rounded-lg border border-gray-100">
+                        <StickyNote className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <p className="text-[10px] text-gray-500 leading-relaxed font-medium">
+                          {table.notes}
+                        </p>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent className="p-4">
                     <div className="space-y-2 min-h-[120px]">
                       {assignedGuests.length > 0 ? (
-                        assignedGuests.map((g) => (
-                          <div
-                            key={g.id}
-                            className="group text-sm flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-transparent hover:border-gray-200 transition-colors"
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="w-1.5 h-1.5 bg-gray-300 rounded-full flex-shrink-0" />
-                              <span
-                                className="font-medium text-gray-700"
-                                title={g.name}
-                              >
-                                {g.name}
-                              </span>
-                              {(g.status === "attended" ||
-                                g.status === "souvenir_delivered") && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div>
-                                      <CheckCircle2 className="w-3.5 h-3.5 text-green-500 fill-green-50/50 cursor-default" />
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent
-                                    side="top"
-                                    className="text-[10px]"
-                                  >
-                                    {g.status === "souvenir_delivered"
-                                      ? "Souvenir Redeemed"
-                                      : "Attended"}
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                              {g.status === "declined" && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div>
-                                      <XCircle className="w-3.5 h-3.5 text-red-500 fill-red-50/50 cursor-default" />
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent
-                                    side="top"
-                                    className="text-[10px]"
-                                  >
-                                    Declined
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
+                        assignedGuests.map((g) => {
+                          const isCheckedIn =
+                            g.status === "attended" ||
+                            g.status === "souvenir_delivered";
+
+                          return (
+                            <div
+                              key={g.id}
+                              className="group text-sm flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-transparent hover:border-gray-200 transition-colors"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full flex-shrink-0" />
+                                <div className="flex flex-col min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span
+                                      className="font-medium text-gray-700"
+                                      title={g.name}
+                                    >
+                                      {g.name}
+                                    </span>
+                                    {isCheckedIn && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <div>
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-green-500 fill-green-50/50 cursor-default" />
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent
+                                          side="top"
+                                          className="text-[10px]"
+                                        >
+                                          {g.status === "souvenir_delivered"
+                                            ? "Souvenir Redeemed"
+                                            : "Attended"}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                    {g.status === "declined" && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <div>
+                                            <XCircle className="w-3.5 h-3.5 text-red-500 fill-red-50/50 cursor-default" />
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent
+                                          side="top"
+                                          className="text-[10px]"
+                                        >
+                                          Declined
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-gray-400">
+                                    Invite: {g.pax_count} pax
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`text-xs font-mono px-1.5 py-0.5 rounded border transition-colors ${
+                                    isCheckedIn
+                                      ? "bg-green-50 text-green-600 border-green-100 font-bold"
+                                      : "bg-white text-gray-500 border-gray-100"
+                                  }`}
+                                  title={
+                                    isCheckedIn
+                                      ? "Attended Pax"
+                                      : "Invitation Pax"
+                                  }
+                                >
+                                  {isCheckedIn
+                                    ? g.attended_pax || g.pax_count
+                                    : g.pax_count}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    handleAssign(g.id, "unassigned")
+                                  }
+                                  className="p-1 rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition-all focus:outline-none focus:ring-2 focus:ring-red-100 cursor-pointer"
+                                  title="Unassign"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-100">
-                                {g.pax_count}
-                              </span>
-                              <button
-                                onClick={() => handleAssign(g.id, "unassigned")}
-                                className="p-1 rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition-all focus:outline-none focus:ring-2 focus:ring-red-100 cursor-pointer"
-                                title="Unassign"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        ))
+                          );
+                        })
                       ) : (
                         <div className="h-full flex flex-col items-center justify-center text-gray-300 text-sm gap-2 py-8 border-2 border-dashed border-gray-100 rounded-xl">
                           <Users className="w-6 h-6 opacity-20" />
@@ -679,6 +744,20 @@ export function SeatingBoard({
           </DialogContent>
         </Dialog>
       </div>
+
+      <AddTableDialog
+        eventId="" // Not needed for update, but required by prop types. Maybe fix prop types or pass dummy.
+        // Actually, updateTable uses ID from table object, createTable uses eventId.
+        // Let's pass the eventId from the first table if available or empty string.
+        // Ideally we should pass eventId as prop to SeatingBoard.
+        open={!!editingTable}
+        onOpenChange={(open) => !open && setEditingTable(null)}
+        table={editingTable}
+        onSuccess={() => {
+          setEditingTable(null);
+          if (onRefresh) onRefresh();
+        }}
+      />
     </TooltipProvider>
   );
 }

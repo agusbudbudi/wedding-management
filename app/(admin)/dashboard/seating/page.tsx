@@ -61,7 +61,11 @@ export default function SeatingPage() {
         )}
       </div>
 
-      <SeatingBoard initialGuests={guests} initialTables={tables} />
+      <SeatingBoard
+        initialGuests={guests}
+        initialTables={tables}
+        onRefresh={() => loadData(activeEventId || undefined)}
+      />
     </div>
   );
 }

@@ -744,7 +744,7 @@ export default function DashboardPage() {
                           })()}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg rounded-tl-none line-clamp-3">
+                    <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg rounded-tl-none line-clamp-4">
                       {log.description}
                     </p>
                   </div>

@@ -22,6 +22,7 @@ export interface Guest {
   photo_url?: string;
   event_id?: string;
   user_id?: string;
+  attended_pax?: number;
   last_log?: GuestLog;
 }
 
@@ -44,6 +45,9 @@ export interface Table {
   assigned_guest_ids: string[];
   event_id?: string;
   user_id?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface RSVP {

@@ -13,7 +13,8 @@ export interface GuestService {
   updateGuestStatus: (
     id: string,
     status: Guest["status"],
-    wishes?: string
+    wishes?: string,
+    attendedPax?: number
   ) => Promise<void>;
   updateGuest: (
     id: string,
@@ -197,10 +198,11 @@ export const supabaseGuestService: GuestService = {
     return result;
   },
 
-  async updateGuestStatus(id, status, wishes) {
+  async updateGuestStatus(id, status, wishes, attendedPax) {
     const supabase = createClient() as any;
     const updateData: any = { status };
     if (wishes !== undefined) updateData.wishes = wishes;
+    if (attendedPax !== undefined) updateData.attended_pax = attendedPax;
 
     const { data: updatedGuest, error } = await supabase
       .from("guests")
@@ -219,6 +221,9 @@ export const supabaseGuestService: GuestService = {
       if (status === "attended") {
         title = "Guest Check-in";
         desc = `${updatedGuest.name} successfully checked in by [staff]`;
+        if (attendedPax !== undefined) {
+          desc += `. Attended pax: ${attendedPax}`;
+        }
       } else if (status === "souvenir_delivered") {
         title = "Souvenir Redeemed";
         desc = `${updatedGuest.name} successfully redeemed souvenir by [staff]`;

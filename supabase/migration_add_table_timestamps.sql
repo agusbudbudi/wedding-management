@@ -1,0 +1,3 @@
+-- Add timestamp columns to tables table
+ALTER TABLE tables ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE tables ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();

@@ -23,6 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/lib/hooks/use-permissions";
+import { CheckInConfirmationDialog } from "@/components/features/check-in/check-in-confirmation-dialog";
 
 export default function CheckInPage() {
   const [scannedData, setScannedData] = useState<string | null>(null);
@@ -39,6 +40,11 @@ export default function CheckInPage() {
   const [showResults, setShowResults] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const { hasPermission, loading } = usePermissions();
+
+  // Confirmation Dialog
+  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
+  const [pendingGuests, setPendingGuests] = useState<Guest[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const canView = hasPermission("check_in", "view");
   const canScan = hasPermission("check_in", "scan");
@@ -91,23 +97,197 @@ export default function CheckInPage() {
   const handleBulkCheckIn = async () => {
     if (selectedGuests.length === 0) return;
 
+    // Filter guests that need check-in (not attended yet)
+    const guestsToCheckIn = selectedGuests.filter(
+      (g) => g.status !== "attended" && g.status !== "souvenir_delivered"
+    );
+
+    if (guestsToCheckIn.length > 0) {
+      // Open confirmation dialog
+      setPendingGuests(guestsToCheckIn);
+      setIsConfirmationOpen(true);
+    } else {
+      // Only redemption
+      await processGuests(selectedGuests, []);
+    }
+  };
+
+  const handleConfirmCheckIn = async (
+    confirmedData: { guestId: string; attendedPax: number }[]
+  ) => {
+    setIsProcessing(true);
+    try {
+      // Identify guests to process (from pending or selected)
+      // If pendingGuests is set, we are processing those.
+      // But in bulk check-in, we might have mixed check-in/redeem.
+      // pendingGuests only contains those needing check-in.
+      // We need to merge with the redemption-only ones if logic requires, but simple approach:
+      // Just process the confirmed ones as check-in, and if there were others selected for redemption...
+      // The current flow for "Scan" is single guest.
+      // The current flow for "Bulk" is selectedGuests.
+
+      // If we are coming from Bulk Selection:
+      if (selectedGuests.length > 0) {
+        // Guests to check-in are in confirmedData
+        // Guests to redeem (already attended) are in selectedGuests but NOT in confirmedData (or simple check against status)
+        await processGuests(selectedGuests, confirmedData);
+      } else if (pendingGuests.length > 0) {
+        // Single Scan Flow
+        await processGuests(pendingGuests, confirmedData);
+      }
+
+      setIsConfirmationOpen(false);
+
+      // Toast handled in processGuests
+      setStatus("success");
+
+      // Note: Do NOT clear guests here immediately if we want to show them on success page!
+      // But based on the code at line 551+:
+      // It uses `guest` (single) or `selectedGuests` (bulk) to display info on success card.
+      // If we clear them, the success card will be empty.
+
+      // However, the original code had `loadGuests()` which refreshes the list in background.
+      // The success view relies on `guest` state or `selectedGuests`.
+
+      // IF we are in bulk mode:
+      // We must render the success card which uses `selectedGuests`.
+      // So we should NOT clear selectedGuests yet if we want to show them in the success card.
+      // BUT `handleBulkCheckIn` logic (line 200 in previous versions) did clear them?
+      // Wait, let's look at `processGuests` (which I previously modified or is adjacent).
+
+      // Actually, looking at the render logic (line 575):
+      // `guest || selectedGuests.length > 0`
+
+      // If I clear `selectedGuests` here, the success card will render, but the content inside might be empty?
+      // No, line 575 checks length. If 0, it renders nothing or fallback?
+
+      // Let's keep `selectedGuests` populated for the success view.
+      // But we need to make sure we don't clear them in `finally` block or elsewhere.
+      // I added `setSelectedGuests([])` in previous turn. I should REMOVE it from here.
+      // The success view likely has a "Back" or "Scan Next" button that clears it.
+
+      // Wait, if I set status to 'success', the view switches to the success card (line 526).
+      // Inside that card, it uses `selectedGuests`.
+      // So I must NOT clear `selectedGuests` here.
+
+      // Also, for single scan (pendingGuests), previously `setGuest(foundGuest)` was likely called in `processCheckIn`.
+      // If `pendingGuests` was used to populate the dialog, we might need to set `guest` state for the success view if it's a single scan?
+      // Or does the success view handle `pendingGuests`?
+      // No, line 551 uses `guest`.
+
+      // If this was a single scan flow:
+      // `pendingGuests` has 1 item.
+      // We should probably set `setGuest(pendingGuests[0])` so the success card shows it.
+
+      // Update local guest objects with confirmed attended_pax for display
+      const updatedConfirmedGuests = confirmedData
+        .map((c) => {
+          const originalGuest = [...pendingGuests, ...selectedGuests].find(
+            (g) => g.id === c.guestId
+          );
+          if (originalGuest) {
+            return { ...originalGuest, attended_pax: c.attendedPax };
+          }
+          return null; // Should not happen
+        })
+        .filter(Boolean) as Guest[];
+
+      if (pendingGuests.length === 1 && selectedGuests.length === 0) {
+        // Single Scan Flow
+        const updatedGuest = updatedConfirmedGuests.find(
+          (g) => g.id === pendingGuests[0].id
+        );
+        if (updatedGuest) setGuest(updatedGuest);
+      } else if (selectedGuests.length > 0) {
+        // Bulk Flow: Update selectedGuests to reflect attended pax
+        setSelectedGuests((current) =>
+          current.map((g) => {
+            const confirmed = confirmedData.find((c) => c.guestId === g.id);
+            if (confirmed) {
+              return { ...g, attended_pax: confirmed.attendedPax };
+            }
+            return g;
+          })
+        );
+      }
+
+      setPendingGuests([]);
+      // setSelectedGuests([]); // REMOVED: Keep selected guests for success page display
+
+      loadGuests(); // Refresh list in background
+    } finally {
+      setIsProcessing(false);
+      // Only reset if we didn't succeed (if we succeeded, we want to show the success page)
+      // The original issue was setStatus("idle") overwriting setStatus("success").
+
+      // We check if status was NOT set to success in the try block
+      // BUT `setStatus` is async/state update, we can't check `status` ref directly here easily without refs.
+      // However, we know we set it to success inside try.
+
+      // Let's just NOT set it to idle here.
+      // The Success Page has a "Back to Scan" button or similar that should reset it to idle.
+      // If error occurred, toast is shown, and we might want to go back to idle?
+      // Or stay in error state?
+      // Usually error state -> idle is fine.
+
+      // Let's use a flag or just remove it and rely on the catch block?
+      // catch block shows toast.
+
+      // If I remove `setStatus("idle")` from here:
+      // 1. Success case: `setStatus("success")` stays. Correct.
+      // 2. Error case: `setStatus("loading")` (from processGuests) stays?
+      //    We need to reset it on error.
+    }
+  };
+
+  const processGuests = async (
+    guests: Guest[],
+    confirmationData: { guestId: string; attendedPax: number }[]
+  ) => {
     try {
       setStatus("loading");
-      const promises = selectedGuests.map((g) => {
-        // If guest is already attended, they are being selected for souvenir redemption
-        const nextStatus =
-          g.status === "attended" ? "souvenir_delivered" : "attended";
-        return supabaseGuestService.updateGuestStatus(g.id, nextStatus);
+      const promises = guests.map((g) => {
+        // Check if this guest is in confirmation data (meaning they are being checked in)
+        const confirmation = confirmationData.find((d) => d.guestId === g.id);
+
+        if (confirmation) {
+          // Update status to attended with specific pax
+          return supabaseGuestService.updateGuestStatus(
+            g.id,
+            "attended",
+            undefined,
+            confirmation.attendedPax
+          );
+        } else {
+          // Redemption or other status logic
+          // If guest is already attended, they are being selected for souvenir redemption
+          if (g.status === "attended") {
+            return supabaseGuestService.updateGuestStatus(
+              g.id,
+              "souvenir_delivered"
+            );
+          }
+          // If not attended and not confirmed (somehow?), fallback to simple update?
+          // This branch should mostly hit redemption.
+          return Promise.resolve();
+        }
       });
+
       await Promise.all(promises);
 
-      const hasRedemption = selectedGuests.some((g) => g.status === "attended");
-      const hasCheckIn = selectedGuests.some((g) => g.status !== "attended");
+      // Determine successful message based on what happened
+      // We need to know what guests transitioned.
+      const checkedInCount = confirmationData.length;
+      const redeemedCount = guests.length - checkedInCount;
+
       let message = "Successfully processed guests";
-      if (hasRedemption && !hasCheckIn)
-        message = `Successfully redeemed ${selectedGuests.length} souvenirs`;
-      if (!hasRedemption && hasCheckIn)
-        message = `Successfully checked in ${selectedGuests.length} guests`;
+      if (checkedInCount > 0 && redeemedCount > 0) {
+        message = `Checked in ${checkedInCount} and Redeemed ${redeemedCount} guests`;
+      } else if (checkedInCount > 0) {
+        message = `Successfully checked in ${checkedInCount} guests`;
+      } else if (redeemedCount > 0) {
+        message = `Successfully redeemed ${redeemedCount} souvenirs`;
+      }
 
       toast.success(message);
       setStatus("success");
@@ -117,6 +297,7 @@ export default function CheckInPage() {
       console.error(e);
       toast.error("Failed to process some guests");
       setStatus("error");
+      throw e;
     }
   };
 
@@ -167,11 +348,9 @@ export default function CheckInPage() {
       // 1. Attendance Scanning Logic (Slug/Link)
       if (!isUUID) {
         if (["confirmed", "sent", "viewed"].includes(result.status)) {
-          await supabaseGuestService.updateGuestStatus(result.id, "attended");
-          const updated = await supabaseGuestService.getGuestById(result.id);
-          if (updated) setGuest(updated);
-          setStatus("success");
-          toast.success("Guest Checked In Successfully");
+          // Open Confirmation Dialog for Check-in
+          setPendingGuests([result]);
+          setIsConfirmationOpen(true);
         } else if (
           result.status === "attended" ||
           result.status === "souvenir_delivered"
@@ -184,14 +363,7 @@ export default function CheckInPage() {
       // 2. Souvenir Scanning Logic (UUID/Voucher)
       else {
         if (result.status === "attended") {
-          await supabaseGuestService.updateGuestStatus(
-            result.id,
-            "souvenir_delivered"
-          );
-          const updated = await supabaseGuestService.getGuestById(result.id);
-          if (updated) setGuest(updated);
-          setStatus("success");
-          toast.success("Souvenir Redeemed Successfully");
+          await processGuests([result], []); // Empty confirmation data means just redemption
         } else if (result.status === "souvenir_delivered") {
           setStatus("already_checked");
         } else {
@@ -501,7 +673,8 @@ export default function CheckInPage() {
                       </p>
                       <div className="flex justify-center gap-3 text-sm font-medium text-gray-600">
                         <span className="bg-white/80 px-3 py-1 rounded-full shadow-sm">
-                          {guest.pax_count} Pax
+                          {guest.attended_pax ?? guest.pax_count} Pax{" "}
+                          {guest.attended_pax !== undefined ? "(Attended)" : ""}
                         </span>
                         <span className="bg-white/80 px-3 py-1 rounded-full shadow-sm uppercase">
                           {guest.category}
@@ -540,7 +713,8 @@ export default function CheckInPage() {
                       <p className="text-center text-sm font-bold text-green-600">
                         Total:{" "}
                         {selectedGuests.reduce(
-                          (acc, g) => acc + (g.pax_count || 0),
+                          (acc, g) =>
+                            acc + (g.attended_pax ?? g.pax_count ?? 0),
                           0
                         )}{" "}
                         Pax
@@ -577,6 +751,14 @@ export default function CheckInPage() {
           </Card>
         )}
       </div>
+
+      <CheckInConfirmationDialog
+        isOpen={isConfirmationOpen}
+        onOpenChange={setIsConfirmationOpen}
+        guests={pendingGuests}
+        onConfirm={handleConfirmCheckIn}
+        isLoading={isProcessing}
+      />
     </div>
   );
 }

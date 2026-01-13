@@ -1,6 +1,4 @@
-"use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -33,6 +31,8 @@ import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
 import { supabaseTableService } from "@/lib/services/table-service";
 import { useRouter } from "next/navigation";
+import { Table } from "@/lib/types";
+import { Textarea } from "@/components/ui/textarea";
 
 const formSchema = z.object({
   name: z
@@ -42,16 +42,30 @@ const formSchema = z.object({
     message: "Capacity must be at least 1",
   }),
   shape: z.enum(["round", "rect"]),
+  notes: z.string().optional(),
 });
 
 interface AddTableDialogProps {
   eventId: string;
   onSuccess?: () => void;
+  table?: Table | null; // For Edit Mode
+  open?: boolean; // Controlled state
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function AddTableDialog({ eventId, onSuccess }: AddTableDialogProps) {
-  const [open, setOpen] = useState(false);
+export function AddTableDialog({
+  eventId,
+  onSuccess,
+  table,
+  open: controlledOpen,
+  onOpenChange: setControlledOpen,
+}: AddTableDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const router = useRouter();
+
+  const isControlled = controlledOpen !== undefined;
+  const show = isControlled ? controlledOpen : internalOpen;
+  const setShow = isControlled ? setControlledOpen! : setInternalOpen;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -59,40 +73,78 @@ export function AddTableDialog({ eventId, onSuccess }: AddTableDialogProps) {
       name: "",
       capacity: "10",
       shape: "round",
+      notes: "",
     },
   });
+
+  // Effect to reset form when table changes (Edit Mode)
+  useEffect(() => {
+    if (show) {
+      if (table) {
+        form.reset({
+          name: table.name,
+          capacity: table.capacity.toString(),
+          shape: table.shape as "round" | "rect",
+          notes: table.notes || "",
+        });
+      } else {
+        form.reset({
+          name: "",
+          capacity: "10",
+          shape: "round",
+          notes: "",
+        });
+      }
+    }
+  }, [table, show, form]);
 
   const { isSubmitting } = form.formState;
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      await supabaseTableService.createTable({
-        ...values,
-        capacity: parseInt(values.capacity, 10),
-        event_id: eventId,
-      });
-      setOpen(false);
+      if (table) {
+        // Update
+        await supabaseTableService.updateTable(table.id, {
+          name: values.name,
+          capacity: parseInt(values.capacity, 10),
+          shape: values.shape,
+          notes: values.notes,
+        });
+      } else {
+        // Create
+        await supabaseTableService.createTable({
+          ...values,
+          capacity: parseInt(values.capacity, 10),
+          event_id: eventId,
+        });
+      }
+
+      setShow(false);
       form.reset();
       router.refresh();
       if (onSuccess) onSuccess();
     } catch (error) {
-      console.error("Failed to create table", error);
+      console.error("Failed to save table", error);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button disabled={!eventId} className="cursor-pointer">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Table
-        </Button>
-      </DialogTrigger>
+    <Dialog open={show} onOpenChange={setShow}>
+      {!isControlled && (
+        <DialogTrigger asChild>
+          <Button disabled={!eventId} className="cursor-pointer">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Table
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add New Table</DialogTitle>
+          <DialogTitle>{table ? "Edit Table" : "Add New Table"}</DialogTitle>
           <DialogDescription>
-            Create a new table for seating arrangement.
+            {table
+              ? "Make changes to the table details."
+              : "Create a new table for seating arrangement."}
           </DialogDescription>
         </DialogHeader>
 
@@ -160,6 +212,24 @@ export function AddTableDialog({ eventId, onSuccess }: AddTableDialogProps) {
               />
             </div>
 
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="e.g. Near stage, Needs high chair..."
+                      className="resize-none"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <DialogFooter>
               <Button
                 type="submit"
@@ -169,7 +239,7 @@ export function AddTableDialog({ eventId, onSuccess }: AddTableDialogProps) {
                 {isSubmitting && (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 )}
-                Create Table
+                {table ? "Save Changes" : "Create Table"}
               </Button>
             </DialogFooter>
           </form>

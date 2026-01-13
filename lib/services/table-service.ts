@@ -6,6 +6,7 @@ export interface TableService {
   createTable: (
     table: Omit<Table, "id" | "assigned_guest_ids"> & { event_id: string }
   ) => Promise<Table>;
+  updateTable: (id: string, updates: Partial<Table>) => Promise<Table>;
   assignGuestToTable: (tableId: string, guestId: string) => Promise<boolean>;
   deleteTable: (id: string) => Promise<void>;
 }
@@ -27,6 +28,11 @@ export const supabaseTableService: TableService = {
       query = query.eq("event_id", eventId);
     }
 
+    // Sort by updated_at desc, then created_at desc
+    query = query
+      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false });
+
     const { data, error } = await query;
 
     if (error) {
@@ -47,16 +53,37 @@ export const supabaseTableService: TableService = {
       data: { user },
     } = await supabase.auth.getUser();
 
+    const now = new Date().toISOString();
+
     const { data, error } = await supabase
       .from("tables")
       .insert([
         {
           ...table,
           user_id: user?.id,
+          created_at: now,
+          updated_at: now,
         },
       ])
       .select()
       .maybeSingle();
+
+    if (error) throw error;
+    return data as Table;
+  },
+
+  async updateTable(id, updates) {
+    const supabase = createClient() as any;
+
+    const { data, error } = await supabase
+      .from("tables")
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single();
 
     if (error) throw error;
     return data as Table;

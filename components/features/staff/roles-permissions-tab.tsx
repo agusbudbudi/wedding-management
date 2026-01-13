@@ -5,6 +5,12 @@ import { supabaseRoleService } from "@/lib/services/role-service";
 import { RoleWithPermissions, Permission } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -28,6 +34,7 @@ export function RolesPermissionsTab({ eventId }: RolesPermissionsTabProps) {
   const [editingRole, setEditingRole] = useState<RoleWithPermissions | null>(
     null
   );
+  const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -63,12 +70,16 @@ export function RolesPermissionsTab({ eventId }: RolesPermissionsTabProps) {
       toast.error("Cannot delete system roles");
       return;
     }
+    setRoleToDelete(roleId);
+  };
 
-    if (!confirm("Are you sure you want to delete this role?")) return;
+  const confirmDelete = async () => {
+    if (!roleToDelete) return;
 
     try {
-      await supabaseRoleService.deleteRole(roleId);
+      await supabaseRoleService.deleteRole(roleToDelete);
       toast.success("Role deleted successfully");
+      setRoleToDelete(null);
       loadData();
     } catch (error: any) {
       toast.error(error.message || "Failed to delete role");
@@ -221,6 +232,42 @@ export function RolesPermissionsTab({ eventId }: RolesPermissionsTabProps) {
         permissionsByResource={permissionsByResource}
         onSuccess={handleSuccess}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!roleToDelete}
+        onOpenChange={(open) => !open && setRoleToDelete(null)}
+      >
+        <DialogContent className="max-w-md rounded-[2rem] border-none shadow-2xl p-6 text-left">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">
+              Delete Role?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-gray-500">
+              Are you sure you want to delete this role? This action cannot be
+              undone.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setRoleToDelete(null)}
+              className="rounded-xl font-bold cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              className="rounded-xl font-bold shadow-lg shadow-red-100 cursor-pointer"
+            >
+              Delete Role
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

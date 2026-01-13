@@ -16,6 +16,7 @@ export interface Database {
           slug: string;
           category: string;
           pax_count: number;
+          attended_pax: number | null;
           status: "draft" | "sent" | "viewed" | "confirmed" | "declined";
           phone_number: string | null;
           created_at: string;
@@ -26,6 +27,7 @@ export interface Database {
           slug: string;
           category: string;
           pax_count: number;
+          attended_pax?: number | null;
           status?: "draft" | "sent" | "viewed" | "confirmed" | "declined";
           phone_number?: string | null;
           created_at?: string;
@@ -36,6 +38,7 @@ export interface Database {
           slug?: string;
           category?: string;
           pax_count?: number;
+          attended_pax?: number | null;
           status?: "draft" | "sent" | "viewed" | "confirmed" | "declined";
           phone_number?: string | null;
           created_at?: string;
