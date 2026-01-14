@@ -20,12 +20,15 @@ export const supabaseTableService: TableService = {
 
     let query = supabase.from("tables").select("*");
 
-    if (user) {
-      query = query.eq("user_id", user.id);
-    }
-
+    // If eventId is provided, we fetch ALL tables for that event
+    // (RLS policies will ensure the user has access to that event)
     if (eventId) {
       query = query.eq("event_id", eventId);
+    } else {
+      // Fallback: if no event specified, only show tables owned by user
+      if (user) {
+        query = query.eq("user_id", user.id);
+      }
     }
 
     // Sort by updated_at desc, then created_at desc

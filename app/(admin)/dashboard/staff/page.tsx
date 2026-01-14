@@ -124,7 +124,7 @@ export default function StaffPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="staff" className="space-y-6">
+      <Tabs defaultValue="staff" className="space-y-4">
         <TabsList className="grid w-sm max-w-md grid-cols-2 bg-white border border-gray-100 p-1.5 rounded-xl h-auto">
           <TabsTrigger
             value="staff"

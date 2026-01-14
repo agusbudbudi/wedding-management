@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Permission } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
+import { authService } from "@/lib/services/auth-service";
 
 export function usePermissions() {
   const [role, setRole] = useState<string | null>(null);
@@ -21,9 +22,7 @@ export function usePermissions() {
 
       try {
         const supabase = createClient() as any;
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await authService.getUser();
 
         if (!user) {
           setRole(null);

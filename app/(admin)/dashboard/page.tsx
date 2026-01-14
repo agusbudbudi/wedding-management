@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { supabaseGuestService } from "@/lib/services/guest-service";
 import { supabaseEventService } from "@/lib/services/event-service";
 import { logService } from "@/lib/services/log-service";
+import { souvenirService } from "@/lib/services/souvenir-service";
 import { Event, GuestLog } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -22,17 +23,50 @@ import {
   Gift,
   RefreshCcw,
   Download,
+  Package,
+  Star,
+  Heart,
+  Crown,
+  Sparkles,
+  Trophy,
+  Medal,
+  Gem,
+  Hexagon,
+  Award,
+  CircleDot,
+  Boxes,
+  Coins,
+  Flower2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { exportService } from "@/lib/services/export-service";
+import { cn } from "@/lib/utils";
 import { ExportDropdown } from "@/components/features/export-dropdown";
 import { DashboardAnalytics } from "@/components/features/dashboard-analytics";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
 
+const ICONS: Record<string, any> = {
+  Gift,
+  Package,
+  Star,
+  Heart,
+  Crown,
+  Sparkles,
+  Trophy,
+  Medal,
+  Gem,
+  Hexagon,
+  Award,
+  CircleDot,
+  Boxes,
+  Coins,
+  Flower2,
+};
+
 export default function DashboardPage() {
-  const [guests, setGuests] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeEvent, setActiveEvent] = useState<Event | null>(null);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
@@ -42,6 +76,7 @@ export default function DashboardPage() {
   const [showTray, setShowTray] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [logs, setLogs] = useState<GuestLog[]>([]);
+  const [souvenirs, setSouvenirs] = useState<any[]>([]);
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
@@ -63,16 +98,24 @@ export default function DashboardPage() {
 
   async function loadData(eventId?: string) {
     try {
-      const [guestsData, eventData, logsData] = await Promise.all([
-        supabaseGuestService.getGuests(eventId),
-        eventId
-          ? supabaseEventService.getEventById(eventId)
-          : Promise.resolve(null),
-        eventId ? logService.getLogsByEventId(eventId, 5) : Promise.resolve([]),
-      ]);
-      setGuests(guestsData);
+      const [statsData, eventData, logsData, souvenirsData] = await Promise.all(
+        [
+          eventId
+            ? supabaseGuestService.getEventStats(eventId)
+            : Promise.resolve(null),
+          eventId
+            ? supabaseEventService.getEventById(eventId)
+            : Promise.resolve(null),
+          eventId
+            ? logService.getLogsByEventId(eventId, 5)
+            : Promise.resolve([]),
+          eventId ? souvenirService.getSouvenirs(eventId) : Promise.resolve([]),
+        ]
+      );
+      setStats(statsData);
       setActiveEvent(eventData);
       setLogs(logsData);
+      setSouvenirs(souvenirsData);
     } finally {
       setLoading(false);
     }
@@ -103,45 +146,48 @@ export default function DashboardPage() {
     };
   }, [activeEventId]);
 
-  const handleExportExcel = () => {
-    if (!guests || guests.length === 0) {
-      toast.error("No guests to export");
-      return;
+  const handleExportExcel = async () => {
+    if (!activeEventId) return;
+    try {
+      const guestsData = await supabaseGuestService.getGuests(activeEventId);
+      if (!guestsData || guestsData.length === 0) {
+        toast.error("No guests to export");
+        return;
+      }
+      exportService.exportGuestsToExcel(
+        guestsData,
+        activeEvent?.name || "Event"
+      );
+      toast.success("Exporting excel report...");
+    } catch (error) {
+      toast.error("Failed to load guests for export");
     }
-    exportService.exportGuestsToExcel(guests, activeEvent?.name || "Event");
-    toast.success("Exporting excel report...");
   };
 
-  const handleExportPdf = () => {
-    if (!guests || guests.length === 0) {
-      toast.error("No guests to export");
-      return;
+  const handleExportPdf = async () => {
+    if (!activeEventId) return;
+    try {
+      const guestsData = await supabaseGuestService.getGuests(activeEventId);
+      if (!guestsData || guestsData.length === 0) {
+        toast.error("No guests to export");
+        return;
+      }
+      exportService.exportSummaryToPDF(guestsData, activeEvent);
+      toast.success("Exporting PDF summary...");
+    } catch (error) {
+      toast.error("Failed to load guests for export");
     }
-    exportService.exportSummaryToPDF(guests, activeEvent);
-    toast.success("Exporting PDF summary...");
   };
 
-  const totalGuests = guests.length;
-  const confirmedGuests = guests.filter(
-    (g) =>
-      g.status === "confirmed" ||
-      g.status === "attended" ||
-      g.status === "souvenir_delivered"
-  ).length;
-  const declinedGuests = guests.filter((g) => g.status === "declined").length;
-  const attendedGuests = guests.filter(
-    (g) => g.status === "attended" || g.status === "souvenir_delivered"
-  ).length;
-  const redeemedSouvenirs = guests.filter(
-    (g) => g.status === "souvenir_delivered"
-  ).length;
-  const pendingRSVP = guests.filter(
-    (g) =>
-      !["confirmed", "attended", "souvenir_delivered", "declined"].includes(
-        g.status
-      )
-  ).length;
-  const totalPax = guests.reduce((sum, g) => sum + (g.pax_count || 0), 0);
+  const totalGuests = stats?.totalGuests || 0;
+  const confirmedGuests = stats?.confirmedGuests || 0;
+  const declinedGuests = stats?.declinedGuests || 0;
+  const attendedGuests = stats?.attendedGuests || 0;
+  const redeemedSouvenirs = stats?.redeemedSouvenirs || 0;
+  const pendingRSVP = stats?.pendingRSVP || 0;
+  const currentStock = souvenirs.reduce((acc, s) => acc + s.stock, 0);
+  const totalStock = currentStock + redeemedSouvenirs;
+  const totalPax = stats?.totalPax || 0;
 
   const rsvpPieData = [
     { name: "Confirmed", value: confirmedGuests, color: "#10b981" },
@@ -149,22 +195,7 @@ export default function DashboardPage() {
     { name: "Pending", value: pendingRSVP, color: "#f59e0b" },
   ];
 
-  const categoryBreakdown = useMemo(() => {
-    const counts: Record<string, number> = {};
-    guests.forEach((g) => {
-      const cat = g.category || "other";
-      counts[cat] = (counts[cat] || 0) + 1;
-    });
-
-    return Object.entries(counts)
-      .map(([name, count]) => ({
-        name: name.charAt(0).toUpperCase() + name.slice(1),
-        count,
-        percentage:
-          totalGuests > 0 ? Math.round((count / totalGuests) * 100) : 0,
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [guests, totalGuests]);
+  const categoryBreakdown = stats?.categoryBreakdown || [];
 
   if (loading) {
     return (
@@ -197,7 +228,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
@@ -256,7 +287,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content Stats */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Hero Card */}
             <div className="md:col-span-2 bg-white rounded-[2rem] p-8 shadow-[0_2px_40px_-12px_rgba(0,0,0,0.08)] relative overflow-hidden">
@@ -280,14 +311,8 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="hidden sm:flex -space-x-2">
-                  {guests
-                    .filter(
-                      (g) =>
-                        g.status === "attended" ||
-                        g.status === "souvenir_delivered"
-                    )
-                    .slice(0, 3)
-                    .map((guest, i) => (
+                  {(stats?.recentAttendedGuests || []).map(
+                    (guest: any, i: number) => (
                       <div
                         key={guest.id}
                         className={`w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-[9px] font-black shadow-xs text-white ${
@@ -304,7 +329,8 @@ export default function DashboardPage() {
                           .toUpperCase()
                           .slice(0, 2)}
                       </div>
-                    ))}
+                    )
+                  )}
                   {attendedGuests > 3 && (
                     <div className="w-8 h-8 rounded-full border-2 border-white bg-blue-50 flex items-center justify-center text-[9px] font-black text-blue-600 shadow-xs ">
                       +{attendedGuests - 3}
@@ -456,12 +482,72 @@ export default function DashboardPage() {
             />
           </div>
 
+          {/* Souvenir Stats Breakdown */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <StatCard
+              title="Stock Remaining"
+              value={currentStock.toString()}
+              subValue={`${
+                totalStock > 0
+                  ? Math.round((currentStock / totalStock) * 100)
+                  : 0
+              }% of Total`}
+              trend="Inventory"
+              icon={Gift}
+              color="blue"
+              variant="filled"
+            />
+            <div className="bg-white p-6 rounded-[2rem] shadow-[0_2px_40px_-12px_rgba(0,0,0,0.08)]">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-gray-900">Souvenir Details</h3>
+                <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                  {redeemedSouvenirs} Redeemed
+                </span>
+              </div>
+              <div className="space-y-3">
+                {souvenirs.slice(0, 3).map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-300",
+                          s.color || "bg-blue-50 text-blue-600"
+                        )}
+                      >
+                        {(() => {
+                          const IconComp = ICONS[s.icon] || Gift;
+                          return <IconComp className="w-5 h-5" />;
+                        })()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900 leading-tight">
+                          {s.name}
+                        </p>
+                        <p className="text-[10px] text-gray-500 font-medium">
+                          {s.stock} units in stock
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {souvenirs.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-4">
+                    No souvenirs added
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Analytics Charts */}
-          <DashboardAnalytics guests={guests} logs={logs} />
+          <DashboardAnalytics stats={stats} logs={logs} />
         </div>
 
         {/* Right Sidebar Mock */}
-        <div className="space-y-8">
+        <div className="space-y-6">
           {/* Calendar Widget */}
           <div className="bg-white p-6 rounded-[2rem] shadow-[0_2px_40px_-12px_rgba(0,0,0,0.08)] relative overflow-hidden">
             <div className="flex items-center justify-between mb-4">
@@ -642,7 +728,7 @@ export default function DashboardPage() {
           {/* Activity Feed */}
           <div className="bg-white p-6 rounded-[2rem] shadow-[0_2px_40px_-12px_rgba(0,0,0,0.08)]">
             <h3 className="font-bold mb-6">Latest Updates</h3>
-            <div className="relative border-l-2 border-dashed border-gray-100 ml-3 space-y-8 pb-4">
+            <div className="relative border-l-2 border-dashed border-gray-100 ml-3 space-y-6 pb-4">
               {logs.length === 0 ? (
                 <div className="pl-6 text-sm text-gray-400">
                   No recent activity
@@ -844,21 +930,31 @@ function StatCard({
                 {subValue}
               </div>
             </div>
-            <div
-              className={`h-1.5 w-full rounded-full overflow-hidden ${
-                isFilled ? "bg-white/20" : "bg-gray-100"
-              }`}
-            >
-              <div
-                className={`h-full rounded-full transition-all duration-1000 ease-out ${getProgressColor(
-                  subValue,
-                  isFilled,
-                  colorMap,
-                  color
-                )}`}
-                style={{ width: subValue }}
-              />
-            </div>
+            {(() => {
+              const numericValue =
+                parseInt((subValue || "0").replace(/[^0-9]/g, "")) || 0;
+              return (
+                <div
+                  className={`h-1.5 w-full rounded-full overflow-hidden ${
+                    isFilled ? "bg-white/20" : "bg-gray-100"
+                  }`}
+                >
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-1000 ease-out",
+                      getProgressColor(
+                        subValue,
+                        isFilled,
+                        colorMap,
+                        color,
+                        numericValue
+                      )
+                    )}
+                    style={{ width: `${numericValue}%` }}
+                  />
+                </div>
+              );
+            })()}
           </div>
         )}
         {children}
@@ -871,15 +967,15 @@ function getProgressColor(
   subValue: string | undefined,
   isFilled: boolean,
   colorMap: Record<string, string>,
-  color: string
+  color: string,
+  percentage: number
 ) {
   if (!subValue)
     return isFilled
       ? "bg-white"
       : colorMap[color]?.split(" ")[1].replace("text-", "bg-") || "bg-primary";
 
-  const percentage = parseInt(subValue);
-  if (isNaN(percentage))
+  if (isNaN(percentage) || percentage === 0)
     return isFilled
       ? "bg-white"
       : colorMap[color]?.split(" ")[1].replace("text-", "bg-") || "bg-primary";

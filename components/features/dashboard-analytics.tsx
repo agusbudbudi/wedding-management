@@ -14,7 +14,11 @@ import { Guest, GuestLog } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface DashboardAnalyticsProps {
-  guests: Guest[];
+  stats: {
+    confirmedGuests: number;
+    declinedGuests: number;
+    pendingRSVP: number;
+  } | null;
   logs: GuestLog[];
 }
 
@@ -27,26 +31,15 @@ const COLORS = [
   "#6366f1",
 ];
 
-export function DashboardAnalytics({ guests, logs }: DashboardAnalyticsProps) {
+export function DashboardAnalytics({ stats, logs }: DashboardAnalyticsProps) {
   const rsvpData = useMemo(() => {
-    const counts = {
-      Confirmed: 0,
-      Declined: 0,
-      Pending: 0,
-    };
-
-    guests.forEach((g) => {
-      if (["confirmed", "attended", "souvenir_delivered"].includes(g.status)) {
-        counts.Confirmed++;
-      } else if (g.status === "declined") {
-        counts.Declined++;
-      } else {
-        counts.Pending++;
-      }
-    });
-
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [guests]);
+    if (!stats) return [];
+    return [
+      { name: "Confirmed", value: stats.confirmedGuests },
+      { name: "Declined", value: stats.declinedGuests },
+      { name: "Pending", value: stats.pendingRSVP },
+    ];
+  }, [stats]);
 
   const attendanceTimeline = useMemo(() => {
     const hourlyData: Record<string, number> = {};

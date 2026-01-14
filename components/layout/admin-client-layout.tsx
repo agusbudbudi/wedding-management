@@ -106,8 +106,8 @@ export function AdminClientLayout({ children, user }: AdminClientLayoutProps) {
   return (
     <div className="flex h-screen bg-[#F8F9FD]">
       {/* Sidebar */}
-      <aside className="w-64 bg-white hidden md:flex flex-col border-r border-gray-100/50 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10">
-        <div className="px-8 py-6">
+      <aside className="w-60 bg-white hidden md:flex flex-col border-r border-gray-100/50 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10">
+        <div className="px-6 py-3">
           <div className="flex items-center gap-3 text-primary">
             <div className="bg-primary/10 p-2 rounded-xl">
               <div className="w-6 h-6 bg-primary rounded-md transform rotate-45" />
@@ -121,9 +121,12 @@ export function AdminClientLayout({ children, user }: AdminClientLayoutProps) {
         <SidebarNav />
 
         <div className="p-4">
-          <div className="relative mt-auto">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-2xl blur opacity-20" />
-            <div className="relative bg-gradient-to-br from-blue-600 to-cyan-500 p-4 rounded-2xl text-white overflow-hidden group">
+          <Link
+            href="/dashboard/subscription"
+            className="relative mt-auto group block"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
+            <div className="relative bg-gradient-to-br from-blue-600 to-cyan-500 p-4 rounded-2xl text-white overflow-hidden transition-all duration-300 group-hover:shadow-lg group-hover:scale-[1.02]">
               {/* Decorative elements */}
               <div className="absolute top-2 right-2 p-3 opacity-10 transform translate-x-1/3 -translate-y-1/3">
                 <Sparkles className="w-20 h-20 fill-current" />
@@ -138,21 +141,12 @@ export function AdminClientLayout({ children, user }: AdminClientLayoutProps) {
                     Upgrade to Pro
                   </h3>
                 </div>
-                <p className="text-blue-50 text-xs mb-2 leading-relaxed opacity-90">
+                <p className="text-blue-50 text-xs leading-relaxed opacity-90">
                   Unlock premium features to elevate your wedding.
                 </p>
-
-                <Link href="/dashboard/subscription">
-                  <Button
-                    size="sm"
-                    className="w-full bg-white text-blue-600 hover:bg-blue-50 border-0 shadow-lg shadow-black/5 font-bold h-9 rounded-xl"
-                  >
-                    Upgrade Now
-                  </Button>
-                </Link>
               </div>
             </div>
-          </div>
+          </Link>
         </div>
       </aside>
 

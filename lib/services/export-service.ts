@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { Guest, Event } from "../types";
+import { RedeemedGuest } from "../types/souvenir";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -291,6 +292,134 @@ export const exportService = {
     }
 
     const filename = `Summary_${eventName.replace(/\s+/g, "_")}_${format(
+      new Date(),
+      "yyyyMMdd"
+    )}.pdf`;
+    doc.save(filename);
+  },
+
+  exportRedeemedGuestsToExcel(redemptions: RedeemedGuest[], eventName: string) {
+    const data = redemptions.map((r) => ({
+      "Guest Name": r.name,
+      Category: r.category,
+      Souvenir: r.souvenir_name,
+      Quantity: r.souvenir_redeemed_quantity,
+      "Redeemed At": format(
+        new Date(r.souvenir_redeemed_at),
+        "dd MMM yyyy, HH:mm"
+      ),
+      "Redeemed By": r.redeemed_by_name,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Redemptions");
+
+    const maxWidths = [
+      { wch: 30 }, // Guest Name
+      { wch: 15 }, // Category
+      { wch: 25 }, // Souvenir
+      { wch: 10 }, // Quantity
+      { wch: 20 }, // Redeemed At
+      { wch: 25 }, // Redeemed By
+    ];
+    worksheet["!cols"] = maxWidths;
+
+    const dateStr = format(new Date(), "yyyyMMdd_HHmm");
+    const filename = `SouvenirRedemptions_${eventName.replace(
+      /\s+/g,
+      "_"
+    )}_${dateStr}.xlsx`;
+
+    XLSX.writeFile(workbook, filename);
+  },
+
+  exportRedeemedGuestsToPDF(redemptions: RedeemedGuest[], event: Event | null) {
+    const doc = new jsPDF();
+    const eventName = event?.name || "Wedding Event";
+    const dateStr = format(new Date(), "dd MMMM yyyy");
+    const timeStr = format(new Date(), "HH:mm");
+
+    // Header Background
+    doc.setFillColor(249, 250, 251);
+    doc.rect(0, 0, 210, 40, "F");
+
+    // Header Content
+    doc.setFontSize(22);
+    doc.setTextColor(31, 41, 55);
+    doc.setFont("helvetica", "bold");
+    doc.text("Souvenir Redemption Report", 14, 20);
+
+    doc.setFontSize(10);
+    doc.setTextColor(107, 114, 128);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${eventName} • Generated on ${dateStr} at ${timeStr}`, 14, 28);
+
+    // Summary Section
+    const totalRedeemed = redemptions.reduce(
+      (sum, r) => sum + r.souvenir_redeemed_quantity,
+      0
+    );
+    const uniqueGuests = new Set(redemptions.map((r) => r.id)).size;
+
+    doc.setFontSize(12);
+    doc.setTextColor(55, 65, 81);
+    doc.setFont("helvetica", "bold");
+    doc.text("Redemption Overview", 14, 50);
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Total Items Redeemed: ${totalRedeemed} units`, 14, 58);
+    doc.text(`Total Guests Served: ${uniqueGuests} guests`, 130, 58);
+
+    // Table
+    autoTable(doc, {
+      startY: 65,
+      head: [
+        [
+          "Guest Name",
+          "Category",
+          "Souvenir Name",
+          "Qty",
+          "Redeemed At",
+          "Redeemed By",
+        ],
+      ],
+      body: redemptions.map((r) => [
+        r.name,
+        r.category,
+        r.souvenir_name,
+        r.souvenir_redeemed_quantity.toString(),
+        format(new Date(r.souvenir_redeemed_at), "dd MMM, HH:mm"),
+        r.redeemed_by_name,
+      ]),
+      theme: "striped",
+      headStyles: {
+        fillColor: [79, 70, 229],
+        fontSize: 10,
+        fontStyle: "bold",
+      },
+      styles: {
+        fontSize: 9,
+        cellPadding: 4,
+      },
+    });
+
+    // Footer
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(156, 163, 175);
+      doc.text(
+        `Wedding Management System • Page ${i} of ${pageCount}`,
+        105,
+        285,
+        { align: "center" }
+      );
+    }
+
+    const filename = `Redemptions_${eventName.replace(/\s+/g, "_")}_${format(
       new Date(),
       "yyyyMMdd"
     )}.pdf`;

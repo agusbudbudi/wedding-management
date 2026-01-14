@@ -183,6 +183,9 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
                 Pax
               </TableHead>
               <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Attended Pax
+              </TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                 <div className="flex items-center gap-2">
                   Status
                   <DropdownMenu>
@@ -279,6 +282,21 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
                   </span>
                 </TableCell>
                 <TableCell>
+                  <span
+                    className={cn(
+                      "font-mono text-sm px-2 py-1 rounded-md",
+                      guest.attended_pax && guest.attended_pax > 0
+                        ? "bg-green-50 text-green-700"
+                        : "bg-gray-50 text-gray-600"
+                    )}
+                  >
+                    {guest.attended_pax !== null &&
+                    guest.attended_pax !== undefined
+                      ? guest.attended_pax
+                      : "-"}
+                  </span>
+                </TableCell>
+                <TableCell>
                   <div className="flex flex-col items-start gap-1">
                     <StatusBadge status={guest.status} />
                     {guest.updated_at && (
@@ -296,8 +314,6 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
                                   return guest.last_log.profile.email;
 
                                 // 2. Robust Fallback: Extract from description if it's there
-                                // Description example: "Guest details updated by Agus Budi (agusbud@yopmail.com)"
-                                // or "... checked in by Staff Name"
                                 const desc = guest.last_log.description;
                                 if (desc.includes(" by ")) {
                                   const parts = desc.split(" by ");
@@ -306,7 +322,16 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
                                   if (name.includes(" (")) {
                                     name = name.split(" (")[0];
                                   }
-                                  return name;
+                                  name = name.trim();
+
+                                  if (
+                                    name &&
+                                    name !== "[staff]" &&
+                                    name !== "[staff name]" &&
+                                    name !== "System"
+                                  ) {
+                                    return name;
+                                  }
                                 }
 
                                 return "System";
@@ -402,7 +427,7 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
             {filteredGuests.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="h-32 text-center text-gray-500"
                 >
                   <div className="flex flex-col items-center justify-center gap-2">

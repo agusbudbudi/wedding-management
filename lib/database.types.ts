@@ -17,9 +17,23 @@ export interface Database {
           category: string;
           pax_count: number;
           attended_pax: number | null;
-          status: "draft" | "sent" | "viewed" | "confirmed" | "declined";
+          status:
+            | "draft"
+            | "sent"
+            | "viewed"
+            | "confirmed"
+            | "declined"
+            | "attended"
+            | "souvenir_delivered";
           phone_number: string | null;
           created_at: string;
+          souvenir_id: string | null;
+          souvenir_redeemed_at: string | null;
+          event_id: string | null;
+          user_id: string | null;
+          wishes: string | null;
+          photo_url: string | null;
+          table_id: string | null;
         };
         Insert: {
           id?: string;
@@ -28,9 +42,23 @@ export interface Database {
           category: string;
           pax_count: number;
           attended_pax?: number | null;
-          status?: "draft" | "sent" | "viewed" | "confirmed" | "declined";
+          status?:
+            | "draft"
+            | "sent"
+            | "viewed"
+            | "confirmed"
+            | "declined"
+            | "attended"
+            | "souvenir_delivered";
           phone_number?: string | null;
           created_at?: string;
+          souvenir_id?: string | null;
+          souvenir_redeemed_at?: string | null;
+          event_id?: string | null;
+          user_id?: string | null;
+          wishes?: string | null;
+          photo_url?: string | null;
+          table_id?: string | null;
         };
         Update: {
           id?: string;
@@ -39,9 +67,23 @@ export interface Database {
           category?: string;
           pax_count?: number;
           attended_pax?: number | null;
-          status?: "draft" | "sent" | "viewed" | "confirmed" | "declined";
+          status?:
+            | "draft"
+            | "sent"
+            | "viewed"
+            | "confirmed"
+            | "declined"
+            | "attended"
+            | "souvenir_delivered";
           phone_number?: string | null;
           created_at?: string;
+          souvenir_id?: string | null;
+          souvenir_redeemed_at?: string | null;
+          event_id?: string | null;
+          user_id?: string | null;
+          wishes?: string | null;
+          photo_url?: string | null;
+          table_id?: string | null;
         };
       };
       tables: {
@@ -70,6 +112,41 @@ export interface Database {
           capacity?: number;
           section?: string;
           assigned_guest_ids?: string[];
+          created_at?: string;
+        };
+      };
+      souvenirs: {
+        Row: {
+          id: string;
+          event_id: string;
+          name: string;
+          description: string | null;
+          stock: number;
+          icon: string;
+          color: string;
+          category_restrictions: string[] | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          name: string;
+          description?: string | null;
+          stock: number;
+          icon: string;
+          color: string;
+          category_restrictions?: string[] | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          event_id?: string;
+          name?: string;
+          description?: string | null;
+          stock?: number;
+          icon?: string;
+          color?: string;
+          category_restrictions?: string[] | null;
           created_at?: string;
         };
       };
@@ -152,6 +229,24 @@ export interface Database {
           updated_at?: string;
         };
       };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      redeem_souvenir: {
+        Args: {
+          p_guest_id: string;
+          p_souvenir_id: string;
+        };
+        Returns: undefined;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
   };
 }

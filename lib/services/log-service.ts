@@ -18,15 +18,15 @@ export const logService = {
     let staffIdentifier = user?.email || "System";
 
     if (user) {
-      // 1. Try metadata first (fastest) - check multiple common fields
-      const meta = user.user_metadata;
-      const nameFromMeta = meta?.full_name || meta?.name || meta?.display_name;
+      // 1. Try metadata first (fastest)
+      const meta = user.user_metadata || {};
+      const nameFromMeta = meta.full_name || meta.name || meta.display_name;
       const userEmail = user.email;
 
       if (nameFromMeta) {
         staffIdentifier = userEmail
           ? `${nameFromMeta} (${userEmail})`
-          : nameFromMeta;
+          : (nameFromMeta as string);
       } else {
         // 2. Try profiles table
         const { data: profile } = await supabase
@@ -46,7 +46,14 @@ export const logService = {
       }
     }
 
-    const description = params.description.replace("[staff]", staffIdentifier);
+    // Safety: ensure staffIdentifier doesn't contain placeholders themselves
+    if (!staffIdentifier || staffIdentifier.includes("[staff]")) {
+      staffIdentifier = user?.email || "System";
+    }
+
+    // Use replaceAll to be safe and handle both [staff] and [staff name]
+    let description = params.description.replaceAll("[staff]", staffIdentifier);
+    description = description.replaceAll("[staff name]", staffIdentifier);
 
     const { error } = await supabase.from("guest_logs").insert([
       {

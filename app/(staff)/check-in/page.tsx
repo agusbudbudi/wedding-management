@@ -11,6 +11,7 @@ import {
   XCircle,
   QrCode,
   Users,
+  User,
   Check,
   Loader2,
   Lock,
@@ -24,6 +25,8 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/lib/hooks/use-permissions";
 import { CheckInConfirmationDialog } from "@/components/features/check-in/check-in-confirmation-dialog";
+import { Souvenir } from "@/lib/types/souvenir";
+import { souvenirService } from "@/lib/services/souvenir-service";
 
 export default function CheckInPage() {
   const [scannedData, setScannedData] = useState<string | null>(null);
@@ -31,10 +34,12 @@ export default function CheckInPage() {
   const [status, setStatus] = useState<
     "idle" | "loading" | "success" | "error" | "already_checked"
   >("idle");
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(true);
 
   // Manual search & selection
   const [allGuests, setAllGuests] = useState<Guest[]>([]);
+  const [souvenirs, setSouvenirs] = useState<Souvenir[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGuests, setSelectedGuests] = useState<Guest[]>([]);
   const [showResults, setShowResults] = useState(false);
@@ -43,6 +48,9 @@ export default function CheckInPage() {
 
   // Confirmation Dialog
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
+  const [confirmationMode, setConfirmationMode] = useState<
+    "check-in" | "redemption" | "combined"
+  >("check-in");
   const [pendingGuests, setPendingGuests] = useState<Guest[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -51,7 +59,13 @@ export default function CheckInPage() {
   const canManual = hasPermission("check_in", "manual");
 
   useEffect(() => {
-    loadGuests();
+    // loadGuests(); // Removed full load
+
+    // Initial load for souvenirs only
+    const eventId = localStorage.getItem("active_event_id");
+    if (eventId) {
+      souvenirService.getSouvenirs(eventId).then(setSouvenirs);
+    }
 
     // Close results when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
@@ -67,21 +81,41 @@ export default function CheckInPage() {
   }, []);
 
   const loadGuests = async () => {
+    // Only refresh if we have an active search or selected guests
     const eventId = localStorage.getItem("active_event_id");
-    const data = await supabaseGuestService.getGuests(eventId || undefined);
-    setAllGuests(data);
+    if (eventId) {
+      if (searchQuery.trim() !== "") {
+        const results = await supabaseGuestService.searchGuests(
+          eventId,
+          searchQuery
+        );
+        setAllGuests(results);
+      }
+      const sData = await souvenirService.getSouvenirs(eventId);
+      setSouvenirs(sData);
+    }
   };
 
-  const filteredGuests =
-    searchQuery.trim() === ""
-      ? []
-      : allGuests
-          .filter(
-            (g) =>
-              g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              g.slug.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-          .slice(0, 10);
+  // Debounced search logic
+  useEffect(() => {
+    const eventId = localStorage.getItem("active_event_id");
+    if (!eventId || searchQuery.trim() === "") {
+      setAllGuests([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const results = await supabaseGuestService.searchGuests(
+        eventId,
+        searchQuery
+      );
+      setAllGuests(results);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const filteredGuests = allGuests; // No longer needs client-side filter
 
   const toggleGuestSelect = (guest: Guest) => {
     setSelectedGuests((prev) => {
@@ -101,94 +135,71 @@ export default function CheckInPage() {
     const guestsToCheckIn = selectedGuests.filter(
       (g) => g.status !== "attended" && g.status !== "souvenir_delivered"
     );
+    const needsCheckIn = selectedGuests.filter(
+      (g) => g.status !== "attended" && g.status !== "souvenir_delivered"
+    );
+    const needsRedemption = selectedGuests.filter(
+      (g) => g.status === "attended"
+    );
 
-    if (guestsToCheckIn.length > 0) {
-      // Open confirmation dialog
-      setPendingGuests(guestsToCheckIn);
-      setIsConfirmationOpen(true);
+    if (needsCheckIn.length > 0 && needsRedemption.length > 0) {
+      setConfirmationMode("combined");
+    } else if (needsRedemption.length > 0) {
+      setConfirmationMode("redemption");
     } else {
-      // Only redemption
-      await processGuests(selectedGuests, []);
+      setConfirmationMode("check-in");
     }
+
+    setPendingGuests(selectedGuests);
+    setIsConfirmationOpen(true);
   };
 
   const handleConfirmCheckIn = async (
-    confirmedData: { guestId: string; attendedPax: number }[]
+    confirmedData: {
+      guestId: string;
+      attendedPax: number;
+      souvenirId: string | null;
+    }[]
   ) => {
-    setIsProcessing(true);
     try {
-      // Identify guests to process (from pending or selected)
-      // If pendingGuests is set, we are processing those.
-      // But in bulk check-in, we might have mixed check-in/redeem.
-      // pendingGuests only contains those needing check-in.
-      // We need to merge with the redemption-only ones if logic requires, but simple approach:
-      // Just process the confirmed ones as check-in, and if there were others selected for redemption...
-      // The current flow for "Scan" is single guest.
-      // The current flow for "Bulk" is selectedGuests.
+      setIsProcessing(true);
 
-      // If we are coming from Bulk Selection:
       if (selectedGuests.length > 0) {
-        // Guests to check-in are in confirmedData
-        // Guests to redeem (already attended) are in selectedGuests but NOT in confirmedData (or simple check against status)
+        // Bulk Flow
         await processGuests(selectedGuests, confirmedData);
-      } else if (pendingGuests.length > 0) {
+      } else {
         // Single Scan Flow
         await processGuests(pendingGuests, confirmedData);
       }
 
       setIsConfirmationOpen(false);
 
-      // Toast handled in processGuests
       setStatus("success");
 
-      // Note: Do NOT clear guests here immediately if we want to show them on success page!
-      // But based on the code at line 551+:
-      // It uses `guest` (single) or `selectedGuests` (bulk) to display info on success card.
-      // If we clear them, the success card will be empty.
-
-      // However, the original code had `loadGuests()` which refreshes the list in background.
-      // The success view relies on `guest` state or `selectedGuests`.
-
-      // IF we are in bulk mode:
-      // We must render the success card which uses `selectedGuests`.
-      // So we should NOT clear selectedGuests yet if we want to show them in the success card.
-      // BUT `handleBulkCheckIn` logic (line 200 in previous versions) did clear them?
-      // Wait, let's look at `processGuests` (which I previously modified or is adjacent).
-
-      // Actually, looking at the render logic (line 575):
-      // `guest || selectedGuests.length > 0`
-
-      // If I clear `selectedGuests` here, the success card will render, but the content inside might be empty?
-      // No, line 575 checks length. If 0, it renders nothing or fallback?
-
-      // Let's keep `selectedGuests` populated for the success view.
-      // But we need to make sure we don't clear them in `finally` block or elsewhere.
-      // I added `setSelectedGuests([])` in previous turn. I should REMOVE it from here.
-      // The success view likely has a "Back" or "Scan Next" button that clears it.
-
-      // Wait, if I set status to 'success', the view switches to the success card (line 526).
-      // Inside that card, it uses `selectedGuests`.
-      // So I must NOT clear `selectedGuests` here.
-
-      // Also, for single scan (pendingGuests), previously `setGuest(foundGuest)` was likely called in `processCheckIn`.
-      // If `pendingGuests` was used to populate the dialog, we might need to set `guest` state for the success view if it's a single scan?
-      // Or does the success view handle `pendingGuests`?
-      // No, line 551 uses `guest`.
-
-      // If this was a single scan flow:
-      // `pendingGuests` has 1 item.
-      // We should probably set `setGuest(pendingGuests[0])` so the success card shows it.
-
-      // Update local guest objects with confirmed attended_pax for display
+      // Update local guest objects with confirmed status/pax for display
       const updatedConfirmedGuests = confirmedData
         .map((c) => {
           const originalGuest = [...pendingGuests, ...selectedGuests].find(
             (g) => g.id === c.guestId
           );
           if (originalGuest) {
-            return { ...originalGuest, attended_pax: c.attendedPax };
+            let nextStatus = originalGuest.status;
+            if (
+              originalGuest.status !== "attended" &&
+              originalGuest.status !== "souvenir_delivered"
+            ) {
+              nextStatus = "attended";
+            } else if (originalGuest.status === "attended") {
+              nextStatus = "souvenir_delivered";
+            }
+
+            return {
+              ...originalGuest,
+              attended_pax: c.attendedPax,
+              status: nextStatus as any,
+            } as Guest;
           }
-          return null; // Should not happen
+          return null;
         })
         .filter(Boolean) as Guest[];
 
@@ -199,12 +210,12 @@ export default function CheckInPage() {
         );
         if (updatedGuest) setGuest(updatedGuest);
       } else if (selectedGuests.length > 0) {
-        // Bulk Flow: Update selectedGuests to reflect attended pax
+        // Bulk Flow: Update selectedGuests to reflect new states
         setSelectedGuests((current) =>
           current.map((g) => {
-            const confirmed = confirmedData.find((c) => c.guestId === g.id);
+            const confirmed = updatedConfirmedGuests.find((c) => c.id === g.id);
             if (confirmed) {
-              return { ...g, attended_pax: confirmed.attendedPax };
+              return confirmed;
             }
             return g;
           })
@@ -212,90 +223,106 @@ export default function CheckInPage() {
       }
 
       setPendingGuests([]);
-      // setSelectedGuests([]); // REMOVED: Keep selected guests for success page display
-
+      setErrorDetail(null);
       loadGuests(); // Refresh list in background
+    } catch (e: any) {
+      console.error(e);
+      setErrorDetail(e.message || "An unexpected error occurred");
+      setStatus("error");
     } finally {
       setIsProcessing(false);
-      // Only reset if we didn't succeed (if we succeeded, we want to show the success page)
-      // The original issue was setStatus("idle") overwriting setStatus("success").
-
-      // We check if status was NOT set to success in the try block
-      // BUT `setStatus` is async/state update, we can't check `status` ref directly here easily without refs.
-      // However, we know we set it to success inside try.
-
-      // Let's just NOT set it to idle here.
-      // The Success Page has a "Back to Scan" button or similar that should reset it to idle.
-      // If error occurred, toast is shown, and we might want to go back to idle?
-      // Or stay in error state?
-      // Usually error state -> idle is fine.
-
-      // Let's use a flag or just remove it and rely on the catch block?
-      // catch block shows toast.
-
-      // If I remove `setStatus("idle")` from here:
-      // 1. Success case: `setStatus("success")` stays. Correct.
-      // 2. Error case: `setStatus("loading")` (from processGuests) stays?
-      //    We need to reset it on error.
     }
   };
 
   const processGuests = async (
     guests: Guest[],
-    confirmationData: { guestId: string; attendedPax: number }[]
+    confirmationData: {
+      guestId: string;
+      attendedPax: number;
+      souvenirId: string | null;
+    }[]
   ) => {
     try {
       setStatus("loading");
-      const promises = guests.map((g) => {
-        // Check if this guest is in confirmation data (meaning they are being checked in)
-        const confirmation = confirmationData.find((d) => d.guestId === g.id);
 
-        if (confirmation) {
-          // Update status to attended with specific pax
+      // Check for insufficient stock before processing redemptions
+      const redemptions = confirmationData.filter((conf) => {
+        return conf.souvenirId;
+      });
+
+      if (redemptions.length > 0) {
+        // Group by souvenirId to check total needed vs available
+        const neededBySouvenir: Record<string, number> = {};
+        redemptions.forEach((conf) => {
+          neededBySouvenir[conf.souvenirId!] =
+            (neededBySouvenir[conf.souvenirId!] || 0) + conf.attendedPax;
+        });
+
+        for (const [sId, needed] of Object.entries(neededBySouvenir)) {
+          const souvenir = souvenirs.find((s) => s.id === sId);
+          if (souvenir && souvenir.stock < needed) {
+            throw new Error(
+              `Insufficient souvenir stock for "${souvenir.name}". Need ${needed}, have ${souvenir.stock}`
+            );
+          }
+        }
+      }
+
+      // Determine action for each guest
+      const promises = confirmationData.map((confirmation) => {
+        const guest = guests.find((g) => g.id === confirmation.guestId);
+        if (!guest) return Promise.resolve();
+
+        // Determine action based on guest current status, not confirmationMode
+        if (
+          guest.status !== "attended" &&
+          guest.status !== "souvenir_delivered"
+        ) {
+          // Perform Check-in
           return supabaseGuestService.updateGuestStatus(
-            g.id,
+            guest.id,
             "attended",
             undefined,
             confirmation.attendedPax
           );
-        } else {
-          // Redemption or other status logic
-          // If guest is already attended, they are being selected for souvenir redemption
-          if (g.status === "attended") {
+        } else if (guest.status === "attended") {
+          // Perform Redemption
+          if (confirmation.souvenirId) {
+            return souvenirService
+              .redeemSouvenir(guest.id, confirmation.souvenirId)
+              .then(() =>
+                supabaseGuestService.updateGuestStatus(
+                  guest.id,
+                  "souvenir_delivered"
+                )
+              );
+          } else {
             return supabaseGuestService.updateGuestStatus(
-              g.id,
+              guest.id,
               "souvenir_delivered"
             );
           }
-          // If not attended and not confirmed (somehow?), fallback to simple update?
-          // This branch should mostly hit redemption.
-          return Promise.resolve();
         }
+        return Promise.resolve();
       });
 
       await Promise.all(promises);
 
-      // Determine successful message based on what happened
-      // We need to know what guests transitioned.
+      // Determine successful message
       const checkedInCount = confirmationData.length;
-      const redeemedCount = guests.length - checkedInCount;
+      const redeemedCount = guests.length - checkedInCount; // Approximate
 
       let message = "Successfully processed guests";
-      if (checkedInCount > 0 && redeemedCount > 0) {
-        message = `Checked in ${checkedInCount} and Redeemed ${redeemedCount} guests`;
-      } else if (checkedInCount > 0) {
-        message = `Successfully checked in ${checkedInCount} guests`;
-      } else if (redeemedCount > 0) {
-        message = `Successfully redeemed ${redeemedCount} souvenirs`;
-      }
+      message = `Successfully processed ${guests.length} guests`;
 
       toast.success(message);
       setStatus("success");
-      // Refresh local data
+      setErrorDetail(null);
       loadGuests();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.error("Failed to process some guests");
+      setErrorDetail(e.message || "Failed to process some guests");
+      toast.error(e.message || "Failed to process some guests");
       setStatus("error");
       throw e;
     }
@@ -304,6 +331,7 @@ export default function CheckInPage() {
   const handleScan = async (decodedText: string) => {
     try {
       setStatus("loading");
+      setErrorDetail(null);
       setScannedData(decodedText);
 
       let slugOrId = decodedText;
@@ -319,13 +347,16 @@ export default function CheckInPage() {
         const payload = JSON.parse(decodedText);
         slugOrId = payload.slug || payload.id || slugOrId;
       } catch (e) {
-        // Not JSON
+        // Not JSON, slugOrId remains decodedText
       }
 
       await processCheckIn(slugOrId);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setErrorDetail(e.message || "Invalid QR Code");
       setStatus("error");
+    } finally {
+      setIsScanning(false);
     }
   };
 
@@ -347,34 +378,44 @@ export default function CheckInPage() {
 
       // 1. Attendance Scanning Logic (Slug/Link)
       if (!isUUID) {
-        if (["confirmed", "sent", "viewed"].includes(result.status)) {
-          // Open Confirmation Dialog for Check-in
+        if (
+          result.status !== "attended" &&
+          result.status !== "souvenir_delivered"
+        ) {
+          // Open Confirmation Dialog for CHECK-IN
           setPendingGuests([result]);
+          setConfirmationMode("check-in");
           setIsConfirmationOpen(true);
         } else if (
           result.status === "attended" ||
           result.status === "souvenir_delivered"
         ) {
+          setErrorDetail(null);
           setStatus("already_checked");
         } else {
+          setErrorDetail("Invalid guest status for check-in");
           setStatus("error");
         }
       }
       // 2. Souvenir Scanning Logic (UUID/Voucher)
       else {
         if (result.status === "attended") {
-          await processGuests([result], []); // Empty confirmation data means just redemption
+          // Open Confirmation Dialog for REDEMPTION
+          setPendingGuests([result]);
+          setConfirmationMode("redemption");
+          setIsConfirmationOpen(true);
         } else if (result.status === "souvenir_delivered") {
+          setErrorDetail(null);
           setStatus("already_checked");
         } else {
           // e.g. Trying to redeem souvenir before check-in or declined status
+          setErrorDetail("Guest must check-in at the entrance first!");
           setStatus("error");
-          if (["confirmed", "sent", "viewed"].includes(result.status)) {
-            toast.error("Guest must check-in at the entrance first!");
-          }
+          toast.error("Guest must check-in at the entrance first!");
         }
       }
     } else {
+      setErrorDetail("Guest not found or inactive");
       setStatus("error");
     }
   };
@@ -383,6 +424,7 @@ export default function CheckInPage() {
     setScannedData(null);
     setGuest(null);
     setStatus("idle");
+    setErrorDetail(null);
     setIsScanning(true);
     setSearchQuery("");
     setSelectedGuests([]);
@@ -645,85 +687,129 @@ export default function CheckInPage() {
                       ? "Souvenir Redeemed"
                       : "Check-in Successful"
                     : (() => {
-                        const hasRedemption = selectedGuests.some(
-                          (g) => g.status === "attended"
-                        );
-                        const hasCheckIn = selectedGuests.some(
-                          (g) => g.status !== "attended"
-                        );
-                        if (hasRedemption && hasCheckIn)
+                        if (confirmationMode === "combined")
                           return "Check-in & Redemption Successful";
-                        if (hasRedemption) return "Bulk Redemption Successful";
+                        if (confirmationMode === "redemption")
+                          return "Bulk Redemption Successful";
                         return "Bulk Check-in Successful";
                       })()
-                  : /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-                      scannedData || ""
-                    )
-                  ? "Redeem Failed"
-                  : "Check-in Failed"}
+                  : (() => {
+                      if (confirmationMode === "combined")
+                        return "Process Failed";
+                      if (confirmationMode === "redemption")
+                        return "Redemption Failed";
+                      return "Check-in Failed";
+                    })()}
               </CardTitle>
+              {status === "error" && errorDetail && (
+                <p className="text-red-500 text-sm font-medium mt-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                  {errorDetail}
+                </p>
+              )}
             </CardHeader>
             <CardContent className="space-y-6 pb-8 text-center px-8">
               {guest || selectedGuests.length > 0 ? (
-                <div className="bg-white/60 rounded-xl p-6 backdrop-blur-sm space-y-4">
-                  {guest ? (
-                    <div className="space-y-2">
-                      <p className="font-bold text-xl text-gray-900">
-                        {guest.name}
-                      </p>
-                      <div className="flex justify-center gap-3 text-sm font-medium text-gray-600">
-                        <span className="bg-white/80 px-3 py-1 rounded-full shadow-sm">
-                          {guest.attended_pax ?? guest.pax_count} Pax{" "}
-                          {guest.attended_pax !== undefined ? "(Attended)" : ""}
-                        </span>
-                        <span className="bg-white/80 px-3 py-1 rounded-full shadow-sm uppercase">
-                          {guest.category}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-3 text-left">
-                      <p className="text-sm font-semibold text-gray-400 uppercase tracking-widest text-center">
-                        {(() => {
-                          const hasRedemption = selectedGuests.some(
-                            (g) => g.status === "attended"
-                          );
-                          const hasCheckIn = selectedGuests.some(
-                            (g) => g.status !== "attended"
-                          );
-                          if (hasRedemption && hasCheckIn)
-                            return "Processed Guests";
-                          if (hasRedemption) return "Redeemed Guests";
-                          return "Checked-in Guests";
-                        })()}
-                      </p>
-                      <ScrollArea className="max-h-48">
-                        <div className="flex flex-wrap gap-2 justify-center">
-                          {selectedGuests.map((g) => (
-                            <Badge
-                              key={g.id}
-                              variant="secondary"
-                              className="bg-green-100 text-green-700 border-green-200"
-                            >
+                <div className="bg-white/60 rounded-2xl p-3 backdrop-blur-sm space-y-4">
+                  {(() => {
+                    const guestsToShow = guest
+                      ? [guest]
+                      : [...selectedGuests].sort((a, b) =>
+                          a.name.localeCompare(b.name)
+                        );
+
+                    const GuestCard = ({ g }: { g: Guest }) => (
+                      <div
+                        key={g.id}
+                        className="bg-white/80 rounded-xl p-4 border border-gray-100 flex items-center justify-between group"
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="p-2 rounded-full flex-shrink-0 bg-blue-50">
+                            <User className="w-4 h-4 text-blue-500" />
+                          </div>
+                          <div className="min-w-0 flex-1 text-left">
+                            <p className="font-semibold text-sm truncate text-gray-900 leading-tight">
                               {g.name}
-                            </Badge>
-                          ))}
+                            </p>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              <span className="text-[10px] text-gray-400 capitalize truncate max-w-[80px]">
+                                {g.category}
+                              </span>
+                              <span className="w-1 h-1 bg-gray-200 rounded-full flex-shrink-0" />
+                              <span className="text-[10px] text-blue-500 font-medium whitespace-nowrap">
+                                Invited: {g.pax_count} pax
+                              </span>
+                              <span className="w-1 h-1 bg-gray-200 rounded-full flex-shrink-0" />
+                              <span className="text-[10px] text-green-600 font-bold whitespace-nowrap">
+                                Attended: {g.attended_pax || 0} pax
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      </ScrollArea>
-                      <p className="text-center text-sm font-bold text-green-600">
-                        Total:{" "}
-                        {selectedGuests.reduce(
-                          (acc, g) =>
-                            acc + (g.attended_pax ?? g.pax_count ?? 0),
-                          0
-                        )}{" "}
-                        Pax
-                      </p>
-                    </div>
-                  )}
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] font-bold uppercase tracking-tighter h-5 px-1.5 border-green-200 bg-green-50 text-green-600 ml-2 shadow-sm whitespace-nowrap"
+                        >
+                          {g.status === "souvenir_delivered"
+                            ? "Redeemed"
+                            : "Checked-in"}
+                        </Badge>
+                      </div>
+                    );
+
+                    return (
+                      <div className="space-y-4">
+                        {!guest && (
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                            Processed Guests ({selectedGuests.length})
+                          </p>
+                        )}
+
+                        <ScrollArea className="max-h-[340px]">
+                          <div className="space-y-3">
+                            {guestsToShow.map((g) => (
+                              <GuestCard key={g.id} g={g} />
+                            ))}
+                          </div>
+                        </ScrollArea>
+
+                        {!guest && (
+                          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200/50">
+                            <div className="text-center">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase">
+                                Total Attended
+                              </p>
+                              <p className="text-lg font-black text-green-700">
+                                {selectedGuests
+                                  .filter((g) => g.status === "attended")
+                                  .reduce(
+                                    (acc, g) => acc + (g.attended_pax || 0),
+                                    0
+                                  )}
+                              </p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase">
+                                Total Redeemed
+                              </p>
+                              <p className="text-lg font-black text-purple-700">
+                                {selectedGuests
+                                  .filter(
+                                    (g) => g.status === "souvenir_delivered"
+                                  )
+                                  .reduce(
+                                    (acc, g) => acc + (g.attended_pax || 0),
+                                    0
+                                  )}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {status === "already_checked" && (
-                    <p className="text-red-500 text-sm font-medium pt-2">
+                    <p className="text-red-500 text-sm font-medium pt-2 text-center">
                       {guest?.status === "souvenir_delivered"
                         ? "Warning: Souvenir already redeemed!"
                         : "Warning: Guest already checked in/not confirmed!"}
@@ -756,6 +842,8 @@ export default function CheckInPage() {
         isOpen={isConfirmationOpen}
         onOpenChange={setIsConfirmationOpen}
         guests={pendingGuests}
+        souvenirs={souvenirs}
+        mode={confirmationMode}
         onConfirm={handleConfirmCheckIn}
         isLoading={isProcessing}
       />

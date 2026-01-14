@@ -50,7 +50,10 @@ export default function SeatingPage() {
           <h1 className="text-3xl font-bold text-gray-900">
             Seating Management
           </h1>
-          <p className="text-gray-500">Arrange tables and guests</p>
+          <p className="text-gray-500">
+            Drag and drop guests into tables or assign tables from the guest
+            card.
+          </p>
         </div>
 
         {canAddTable && (

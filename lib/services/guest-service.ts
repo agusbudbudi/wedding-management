@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
-import { Guest } from "@/lib/types";
+import { Guest, GuestLog } from "@/lib/types";
+import { authService } from "./auth-service";
 import { logService } from "./log-service";
 
 export interface GuestService {
@@ -21,14 +22,28 @@ export interface GuestService {
     data: Partial<Guest & { wishes?: string; updated_at?: string }>
   ) => Promise<void>;
   deleteGuest: (id: string) => Promise<void>;
+  searchGuests: (
+    eventId: string,
+    query: string,
+    limit?: number
+  ) => Promise<Guest[]>;
+  getEventStats: (eventId: string) => Promise<{
+    totalGuests: number;
+    confirmedGuests: number;
+    declinedGuests: number;
+    attendedGuests: number;
+    redeemedSouvenirs: number;
+    pendingRSVP: number;
+    totalPax: number;
+    categoryBreakdown: { name: string; count: number; percentage: number }[];
+    recentAttendedGuests: Guest[];
+  }>;
 }
 
 export const supabaseGuestService: GuestService = {
   async getGuests(eventId) {
     const supabase = createClient() as any;
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await authService.getUser();
 
     if (!user) {
       return [];
@@ -75,25 +90,8 @@ export const supabaseGuestService: GuestService = {
         return [];
       }
 
-      // Try to fetch latest logs for all these guests
-      const guestIds = guests.map((g: any) => g.id);
-      if (guestIds.length > 0) {
-        const { data: logs } = await supabase
-          .from("guest_logs")
-          .select("*")
-          .in("guest_id", guestIds)
-          .order("created_at", { ascending: false })
-          .limit(2000);
-
-        if (logs) {
-          return guests.map((guest: any) => {
-            const lastLog = logs.find((l: any) => l.guest_id === guest.id);
-            return { ...guest, last_log: lastLog };
-          }) as Guest[];
-        }
-      }
-
-      return guests as Guest[];
+      // Populate last_log for each guest
+      return populateLastLogs(supabase, guests);
     }
 
     // No eventId provided, fetch all guests user has access to (via RLS)
@@ -107,26 +105,7 @@ export const supabaseGuestService: GuestService = {
       return [];
     }
 
-    // Try to fetch latest logs for all these guests
-    const guestIds = guests.map((g: any) => g.id);
-    if (guestIds.length > 0) {
-      // Fetch more logs to ensure we don't miss the latest one for each guest
-      const { data: logs } = await supabase
-        .from("guest_logs")
-        .select("*")
-        .in("guest_id", guestIds)
-        .order("created_at", { ascending: false })
-        .limit(2000);
-
-      if (logs) {
-        return guests.map((guest: any) => {
-          const lastLog = logs.find((l: any) => l.guest_id === guest.id);
-          return { ...guest, last_log: lastLog };
-        }) as Guest[];
-      }
-    }
-
-    return guests as Guest[];
+    return populateLastLogs(supabase, guests);
   },
 
   async getGuestBySlug(slug: string) {
@@ -270,4 +249,154 @@ export const supabaseGuestService: GuestService = {
     const { error } = await supabase.from("guests").delete().eq("id", id);
     if (error) throw error;
   },
+
+  async searchGuests(eventId, query, limit = 10) {
+    const supabase = createClient() as any;
+
+    let supabaseQuery = supabase
+      .from("guests")
+      .select("*")
+      .eq("event_id", eventId)
+      .or(`name.ilike.%${query}%,slug.ilike.%${query}%`)
+      .order("name", { ascending: true })
+      .limit(limit);
+
+    const { data, error } = await supabaseQuery;
+
+    if (error) {
+      console.error("Error searching guests:", error);
+      return [];
+    }
+
+    return populateLastLogs(supabase, data);
+  },
+
+  async getEventStats(eventId) {
+    const supabase = createClient() as any;
+
+    // Fetch all guests for this event
+    // Note: We still fetch all guests but only necessary columns to keep it fast
+    // and let the DB do the work if we were to use RPC, but for now we'll do it via query
+    const { data: guests, error } = await supabase
+      .from("guests")
+      .select("status, category, pax_count, attended_pax, name, id")
+      .eq("event_id", eventId);
+
+    if (error) {
+      console.error("Error fetching event stats:", error);
+      throw error;
+    }
+
+    const totalGuests = guests.length;
+    const confirmedGuests = guests.filter((g: any) =>
+      ["confirmed", "attended", "souvenir_delivered"].includes(g.status)
+    ).length;
+    const declinedGuests = guests.filter(
+      (g: any) => g.status === "declined"
+    ).length;
+    const attendedGuests = guests.filter((g: any) =>
+      ["attended", "souvenir_delivered"].includes(g.status)
+    ).length;
+
+    // Calculate sum of units for redeemed souvenirs
+    const redeemedSouvenirs = guests.reduce((sum: number, g: any) => {
+      if (g.status === "souvenir_delivered") {
+        return sum + (g.attended_pax || g.pax_count || 1);
+      }
+      return sum;
+    }, 0);
+    const pendingRSVP = guests.filter(
+      (g: any) =>
+        !["confirmed", "attended", "souvenir_delivered", "declined"].includes(
+          g.status
+        )
+    ).length;
+    const totalPax = guests.reduce(
+      (sum: number, g: any) => sum + (g.pax_count || 0),
+      0
+    );
+
+    // Category Breakdown
+    const counts: Record<string, number> = {};
+    guests.forEach((g: any) => {
+      const cat = g.category || "other";
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+
+    const categoryBreakdown = Object.entries(counts)
+      .map(([name, count]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        count,
+        percentage:
+          totalGuests > 0 ? Math.round((count / totalGuests) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Recent Attended (top 3)
+    const recentAttendedGuests = guests
+      .filter((g: any) => ["attended", "souvenir_delivered"].includes(g.status))
+      .slice(0, 3);
+
+    return {
+      totalGuests,
+      confirmedGuests,
+      declinedGuests,
+      attendedGuests,
+      redeemedSouvenirs,
+      pendingRSVP,
+      totalPax,
+      categoryBreakdown,
+      recentAttendedGuests,
+    };
+  },
 };
+
+// Internal helper to fetch logs and profiles for guests
+async function populateLastLogs(
+  supabase: any,
+  guests: any[]
+): Promise<Guest[]> {
+  if (!guests || guests.length === 0) return [];
+
+  const guestIds = guests.map((g) => g.id);
+
+  // 1. Fetch logs for these guests
+  const { data: logs } = await supabase
+    .from("guest_logs")
+    .select("*")
+    .in("guest_id", guestIds)
+    .order("created_at", { ascending: false });
+
+  if (!logs || logs.length === 0) return guests as Guest[];
+
+  // 2. Fetch profiles for the staff in these logs
+  const staffIds = Array.from(
+    new Set(logs.map((l: any) => l.user_id).filter(Boolean))
+  );
+  let profiles: any[] = [];
+  if (staffIds.length > 0) {
+    const { data: profilesData } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("id", staffIds);
+    profiles = profilesData || [];
+  }
+
+  // 3. Merge logs and profiles into guests
+  return guests.map((guest: any) => {
+    const guestLogs = logs.filter((l: any) => l.guest_id === guest.id);
+    const lastLog = guestLogs[0];
+
+    if (lastLog) {
+      const profile = profiles.find((p) => p.id === lastLog.user_id);
+      return {
+        ...guest,
+        last_log: {
+          ...lastLog,
+          profile: profile,
+        },
+      };
+    }
+    return guest;
+  }) as Guest[];
+}

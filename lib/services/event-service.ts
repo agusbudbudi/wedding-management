@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Event, StaffRole } from "@/lib/types";
 import { subscriptionService } from "./subscription-service";
 import { supabaseNotificationService } from "./notification-service";
+import { authService } from "./auth-service";
 
 export interface EventWithRole extends Event {
   role: StaffRole | string; // Can be StaffRole or dynamic role name
@@ -20,9 +21,7 @@ export const supabaseEventService: EventService = {
   async getEvents() {
     const supabase = createClient() as any;
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await authService.getUser();
 
     if (!user) return [];
 
@@ -41,43 +40,26 @@ export const supabaseEventService: EventService = {
       role: "owner" as StaffRole,
     }));
 
-    // 2. Fetch staff events with role information
+    // 2. Fetch staff events with joined event details
     const { data: staffAssignments, error: staffError } = await supabase
       .from("event_staff")
-      .select("event_id, role, role_id, assigned_role:roles(id, name)")
+      .select("role, role_id, event:events(*), assigned_role:roles(id, name)")
       .eq("user_id", user.id);
 
     if (staffError) {
       console.error("Error fetching staff event roles:", staffError);
     }
 
-    let staffEvents: EventWithRole[] = [];
-    if (staffAssignments && staffAssignments.length > 0) {
-      const eventIds = staffAssignments.map((s: any) => s.event_id);
-      const { data: fetchStaffEvents, error: fetchError } = await supabase
-        .from("events")
-        .select("*")
-        .in("id", eventIds);
-
-      if (fetchError) {
-        console.error("Error fetching staff events details:", fetchError);
-      } else {
-        staffEvents = (fetchStaffEvents || []).map((e: Event) => {
-          const assignment = staffAssignments.find(
-            (s: any) => s.event_id === e.id
-          );
-          return {
-            ...e,
-            role:
-              assignment?.assigned_role?.name || assignment?.role || "staff",
-            roleName: assignment?.assigned_role?.name,
-          };
-        });
-      }
-    }
+    const staffWithRole = (staffAssignments || [])
+      .filter((s: any) => s.event) // Ensure event detail exists
+      .map((s: any) => ({
+        ...s.event,
+        role: s.assigned_role?.name || s.role || "staff",
+        roleName: s.assigned_role?.name,
+      }));
 
     // 3. Merge and deduplicate
-    const combined = [...ownedWithRole, ...staffEvents];
+    const combined = [...ownedWithRole, ...staffWithRole];
     const eventMap = new Map<string, EventWithRole>();
 
     combined.forEach((e: EventWithRole) => {
@@ -97,9 +79,7 @@ export const supabaseEventService: EventService = {
 
   async getEventById(id: string) {
     const supabase = createClient() as any;
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await authService.getUser();
 
     const query = supabase.from("events").select("*").eq("id", id);
 
@@ -126,9 +106,7 @@ export const supabaseEventService: EventService = {
   async createEvent(event) {
     const supabase = createClient() as any;
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await authService.getUser();
 
     if (!user) throw new Error("User not authenticated");
 

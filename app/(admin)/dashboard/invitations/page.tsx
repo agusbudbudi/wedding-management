@@ -900,7 +900,7 @@ export default function InvitationsPage() {
 
                     {(invitation.metadata as any)?.rsvp?.is_active !==
                       false && (
-                      <div className="space-y-8 animate-in slide-in-from-top-2 p-4">
+                      <div className="space-y-6 animate-in slide-in-from-top-2 p-4">
                         {/* Section 1: Invited Guests */}
                         <div className="space-y-4">
                           <h5 className="text-sm font-bold text-gray-900 flex items-center gap-2 pb-1.5">
@@ -1336,7 +1336,7 @@ export default function InvitationsPage() {
                     {/* Guest Section Preview */}
                     {(invitation.metadata as any)?.rsvp?.is_active !==
                       false && (
-                      <div className="px-6 py-8 space-y-8 bg-white">
+                      <div className="px-6 py-8 space-y-6 bg-white">
                         <div className="text-center space-y-3">
                           <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.3em]">
                             {(invitation.metadata as any)?.rsvp
