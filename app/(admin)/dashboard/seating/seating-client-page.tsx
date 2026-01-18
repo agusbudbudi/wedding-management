@@ -1,11 +1,18 @@
 "use client";
 
-export const runtime = "edge";
-
 import { useState, useEffect } from "react";
 import { supabaseGuestService } from "@/lib/services/guest-service";
 import { supabaseTableService } from "@/lib/services/table-service";
-import { SeatingBoard } from "@/components/features/seating/seating-board";
+import dynamic from "next/dynamic";
+
+const SeatingBoard = dynamic(
+  () =>
+    import("@/components/features/seating/seating-board").then(
+      (mod) => mod.SeatingBoard,
+    ),
+  { ssr: false },
+);
+
 import { usePermissions } from "@/lib/hooks/use-permissions";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -13,7 +20,7 @@ import { Plus } from "lucide-react";
 import { AddTableDialog } from "@/components/features/seating/add-table-dialog";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 
-export default function SeatingPage() {
+export function SeatingClientPage() {
   const [guests, setGuests] = useState<any[]>([]);
   const [tables, setTables] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

@@ -46,7 +46,10 @@ export const xenditService = {
       }
 
       const data = await response.json();
-      return data;
+      return {
+        ...data,
+        invoiceUrl: data.invoice_url,
+      };
     } catch (error: any) {
       console.error("Xendit createInvoice error:", error);
       throw error;
@@ -78,7 +81,10 @@ export const xenditService = {
       }
 
       const data = await response.json();
-      return data;
+      return {
+        ...data,
+        invoiceUrl: data.invoice_url,
+      };
     } catch (error: any) {
       console.error("Xendit getInvoice error:", error);
       throw error;

@@ -1,7 +1,5 @@
 "use client";
 
-export const runtime = "edge";
-
 import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,10 +8,29 @@ import { usePermissions } from "@/lib/hooks/use-permissions";
 import { souvenirService } from "@/lib/services/souvenir-service";
 import { Souvenir } from "@/lib/types/souvenir";
 import { SouvenirCard } from "@/components/features/souvenirs/souvenir-card";
-import { SouvenirForm } from "@/components/features/souvenirs/souvenir-form";
-import { toast } from "sonner";
-import { exportService } from "@/lib/services/export-service";
-import { ExportDropdown } from "@/components/features/export-dropdown";
+import dynamic from "next/dynamic";
+
+const SouvenirForm = dynamic(
+  () =>
+    import("@/components/features/souvenirs/souvenir-form").then(
+      (m) => m.SouvenirForm,
+    ),
+  { ssr: false },
+);
+const RedeemedGuestList = dynamic(
+  () =>
+    import("@/components/features/souvenirs/redeemed-guest-list").then(
+      (m) => m.RedeemedGuestList,
+    ),
+  { ssr: false },
+);
+const ExportDropdown = dynamic(
+  () =>
+    import("@/components/features/export-dropdown").then(
+      (m) => m.ExportDropdown,
+    ),
+  { ssr: false },
+);
 import { supabaseEventService } from "@/lib/services/event-service";
 import { Event } from "@/lib/types";
 import {
@@ -28,10 +45,11 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RedeemedGuestList } from "@/components/features/souvenirs/redeemed-guest-list";
 import { PermissionGuard } from "@/components/auth/permission-guard";
+import { toast } from "sonner";
+import { exportService } from "@/lib/services/export-service";
 
-export default function SouvenirsPage() {
+export function SouvenirsClientPage() {
   const [souvenirs, setSouvenirs] = useState<Souvenir[]>([]);
   const [redeemedGuests, setRedeemedGuests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

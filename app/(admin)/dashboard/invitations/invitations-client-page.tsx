@@ -1,7 +1,5 @@
 "use client";
 
-export const runtime = "edge";
-
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabaseInvitationService } from "@/lib/services/invitation-service";
@@ -79,7 +77,7 @@ const templates: {
   },
 ];
 
-export default function InvitationsPage() {
+export function InvitationsClientPage() {
   const [invitation, setInvitation] = useState<Partial<Invitation>>({
     template_type: "wedding",
     title: "",

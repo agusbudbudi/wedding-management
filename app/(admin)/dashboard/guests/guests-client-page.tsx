@@ -1,20 +1,35 @@
 "use client";
 
-export const runtime = "edge";
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseGuestService } from "@/lib/services/guest-service";
-import { GuestList } from "@/components/features/guest-list";
-import { AddGuestDialog } from "@/components/features/add-guest-dialog";
-import { ImportGuestDialog } from "@/components/features/import-guest-dialog";
-import { usePermissions } from "@/lib/hooks/use-permissions";
-import { Loader2, RefreshCcw, Download } from "lucide-react";
-import { exportService } from "@/lib/services/export-service";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Guest, Event as WeddingEvent } from "@/lib/types";
-import { ExportDropdown } from "@/components/features/export-dropdown";
+import dynamic from "next/dynamic";
+
+const GuestList = dynamic(
+  () => import("@/components/features/guest-list").then((mod) => mod.GuestList),
+  { ssr: false },
+);
+const AddGuestDialog = dynamic(
+  () =>
+    import("@/components/features/add-guest-dialog").then(
+      (mod) => mod.AddGuestDialog,
+    ),
+  { ssr: false },
+);
+const ImportGuestDialog = dynamic(
+  () =>
+    import("@/components/features/import-guest-dialog").then(
+      (mod) => mod.ImportGuestDialog,
+    ),
+  { ssr: false },
+);
+const ExportDropdown = dynamic(
+  () =>
+    import("@/components/features/export-dropdown").then(
+      (mod) => mod.ExportDropdown,
+    ),
+  { ssr: false },
+);
 import { supabaseEventService } from "@/lib/services/event-service";
 import { supabaseNotificationService } from "@/lib/services/notification-service";
 import { createClient } from "@/lib/supabase/client";
@@ -22,10 +37,16 @@ import {
   subscriptionService,
   UserSubscription,
 } from "@/lib/services/subscription-service";
-import { TriangleAlert, Info, Zap } from "lucide-react";
+import { TriangleAlert, Zap } from "lucide-react";
 import { PermissionGuard } from "@/components/auth/permission-guard";
+import { usePermissions } from "@/lib/hooks/use-permissions";
+import { Loader2, RefreshCcw } from "lucide-react";
+import { exportService } from "@/lib/services/export-service";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Guest, Event as WeddingEvent } from "@/lib/types";
 
-export default function GuestsPage() {
+export function GuestsClientPage() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);

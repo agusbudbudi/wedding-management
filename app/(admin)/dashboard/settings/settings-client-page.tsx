@@ -1,14 +1,12 @@
 "use client";
 
-export const runtime = "edge";
-
 import { ProfileTab } from "@/components/features/settings/profile-tab";
 import { SubscriptionTab } from "@/components/features/settings/subscription-tab";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 
-export default function SettingsPage() {
+export function SettingsClientPage() {
   return (
     <PermissionGuard resource="events" action="edit" redirectTo="/restricted">
       <div className="space-y-6">

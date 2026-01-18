@@ -1,7 +1,5 @@
 "use client";
 
-export const runtime = "edge";
-
 import { useState, useEffect } from "react";
 import {
   supabaseEventService,
@@ -41,7 +39,7 @@ import {
   UserSubscription,
 } from "@/lib/services/subscription-service";
 
-export default function EventsPage() {
+export function EventsClientPage() {
   const [events, setEvents] = useState<EventWithRole[]>([]);
   const [subscription, setSubscription] = useState<UserSubscription | null>(
     null,

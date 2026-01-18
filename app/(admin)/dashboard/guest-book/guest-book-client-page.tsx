@@ -1,10 +1,9 @@
-import { GuestBookClient } from "./guest-book-client";
+"use client";
 
+import { GuestBookClient } from "./guest-book-client";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 
-export const runtime = "edge";
-
-export default function GuestBookPage() {
+export function GuestBookClientPage() {
   return (
     <PermissionGuard
       resource="guest_book"

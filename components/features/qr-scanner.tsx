@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Html5QrcodeScanner } from "html5-qrcode";
+// Html5QrcodeScanner will be dynamically imported
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
@@ -17,41 +17,49 @@ export function QRScanner({
   isScanning,
   setIsScanning,
 }: QRScannerProps) {
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<any>(null);
 
   useEffect(() => {
-    if (isScanning && !scannerRef.current) {
-      // Initialize scanner
-      const scanner = new Html5QrcodeScanner(
-        "reader",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        /* verbose= */ false
-      );
+    let scanner: any = null;
 
-      scanner.render(
-        (decodedText) => {
-          onScan(decodedText);
-          scanner.clear();
-          scannerRef.current = null;
-          setIsScanning(false);
-        },
-        (errorMessage) => {
-          // console.warn(errorMessage);
-        }
-      );
+    const initScanner = async () => {
+      if (isScanning && !scannerRef.current) {
+        const { Html5QrcodeScanner } = await import("html5-qrcode");
 
-      scannerRef.current = scanner;
-    }
+        // Initialize scanner
+        scanner = new Html5QrcodeScanner(
+          "reader",
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          /* verbose= */ false,
+        );
+
+        scanner.render(
+          (decodedText: string) => {
+            onScan(decodedText);
+            if (scanner) {
+              scanner.clear().catch(console.error);
+              scanner = null;
+              scannerRef.current = null;
+            }
+            setIsScanning(false);
+          },
+          (errorMessage: string) => {
+            // console.warn(errorMessage);
+          },
+        );
+
+        scannerRef.current = scanner;
+      }
+    };
+
+    initScanner();
 
     return () => {
-      if (scannerRef.current) {
-        try {
-          scannerRef.current.clear().catch(console.error);
-        } catch (e) {
-          // ignore cleanup errors
-        }
-        scannerRef.current = null;
+      if (scanner) {
+        scanner.clear().catch(console.error);
+        scanner = null;
       }
+      scannerRef.current = null;
     };
   }, [isScanning, onScan, setIsScanning]);
 

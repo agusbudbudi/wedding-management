@@ -20,8 +20,14 @@ import { supabaseEventService } from "@/lib/services/event-service";
 import { Event } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import dynamic from "next/dynamic";
 import { SidebarNav } from "./sidebar-nav";
-import { NotificationTray } from "../features/notification-tray";
+const NotificationTray = dynamic(
+  () =>
+    import("../features/notification-tray").then((mod) => mod.NotificationTray),
+  { ssr: false },
+);
+import { createClient } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -34,14 +40,17 @@ import {
 
 interface AdminClientLayoutProps {
   children: React.ReactNode;
-  user: {
+  user?: {
     name: string;
     email: string;
     avatar?: string;
   };
 }
 
-export function AdminClientLayout({ children, user }: AdminClientLayoutProps) {
+export function AdminClientLayout({
+  children,
+  user: initialUser,
+}: AdminClientLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -49,6 +58,32 @@ export function AdminClientLayout({ children, user }: AdminClientLayoutProps) {
   const [isPending, startTransition] = useTransition();
   const [activeEvent, setActiveEvent] = useState<Event | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<{
+    name: string;
+    email: string;
+    avatar?: string;
+  } | null>(initialUser || null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const loadUser = async () => {
+      if (initialUser) return;
+      const {
+        data: { user: supabaseUser },
+      } = await supabase.auth.getUser();
+      if (supabaseUser) {
+        setUser({
+          name:
+            supabaseUser.user_metadata?.full_name ||
+            supabaseUser.email?.split("@")[0] ||
+            "User",
+          email: supabaseUser.email || "",
+          avatar: supabaseUser.user_metadata?.avatar_url,
+        });
+      }
+    };
+    loadUser();
+  }, [initialUser]);
 
   useEffect(() => {
     const loadActiveEvent = async () => {
@@ -98,13 +133,6 @@ export function AdminClientLayout({ children, user }: AdminClientLayoutProps) {
       await signOut();
     });
   };
-
-  const initials = user.name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 
   return (
     <div className="flex h-screen bg-[#F8F9FD] overflow-hidden">
@@ -266,76 +294,88 @@ export function AdminClientLayout({ children, user }: AdminClientLayoutProps) {
             <div className="flex items-center gap-2">
               <NotificationTray />
             </div>
-            <div className="h-8 w-[1px] bg-gray-200 mx-2" />
+            {user && (
+              <>
+                <div className="h-8 w-[1px] bg-gray-200 mx-2" />
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-xl transition-colors">
-                  <div className="text-right hidden sm:block">
-                    <p className="text-sm font-semibold text-gray-900 leading-none mb-1">
-                      {user.name}
-                    </p>
-                    <p className="text-xs text-gray-500 leading-none">
-                      {user.email}
-                    </p>
-                  </div>
-                  <Avatar className="w-10 h-10 border-2 border-white shadow-sm ring-1 ring-gray-100">
-                    <AvatarImage src={user.avatar} />
-                    <AvatarFallback>{initials}</AvatarFallback>
-                  </Avatar>
-                </div>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-56 p-2 rounded-xl shadow-xl shadow-gray-200/50 border-gray-100"
-              >
-                <div className="p-2 mb-2 bg-gray-50/50 rounded-lg">
-                  <p className="font-semibold text-sm text-gray-900">
-                    {user.name}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                </div>
-
-                <div className="px-2 py-1.5 mb-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                      Current Plan
-                    </p>
-                    <Link
-                      href="/dashboard/subscription"
-                      className="text-[10px] font-bold text-primary hover:underline"
-                    >
-                      Upgrade
-                    </Link>
-                  </div>
-                  <div className="flex items-center gap-2 bg-blue-50/50 p-2 rounded-lg border border-blue-100">
-                    <div className="bg-blue-100 p-1 rounded-md">
-                      <Zap className="w-3 h-3 text-blue-600 fill-blue-600" />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-xl transition-colors">
+                      <div className="text-right hidden sm:block">
+                        <p className="text-sm font-semibold text-gray-900 leading-none mb-1">
+                          {user.name}
+                        </p>
+                        <p className="text-xs text-gray-500 leading-none">
+                          {user.email}
+                        </p>
+                      </div>
+                      <Avatar className="w-10 h-10 border-2 border-white shadow-sm ring-1 ring-gray-100">
+                        <AvatarImage src={user.avatar} />
+                        <AvatarFallback>
+                          {user.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                            .toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
                     </div>
-                    <span className="text-xs font-bold text-blue-700">
-                      Free Plan
-                    </span>
-                  </div>
-                </div>
-                <DropdownMenuSeparator className="bg-gray-100 mb-1" />
-                <DropdownMenuItem
-                  className="rounded-lg cursor-pointer"
-                  onClick={() => router.push("/dashboard/settings")}
-                >
-                  <User className="w-4 h-4 mr-2 text-gray-400" />
-                  Profile
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-gray-100 my-1" />
-                <DropdownMenuItem
-                  className="rounded-lg cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
-                  onClick={handleLogout}
-                  disabled={isPending}
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  {isPending ? "Logging out..." : "Logout"}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-56 p-2 rounded-xl shadow-xl shadow-gray-200/50 border-gray-100"
+                  >
+                    <div className="p-2 mb-2 bg-gray-50/50 rounded-lg">
+                      <p className="font-semibold text-sm text-gray-900">
+                        {user.name}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {user.email}
+                      </p>
+                    </div>
+
+                    <div className="px-2 py-1.5 mb-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                          Current Plan
+                        </p>
+                        <Link
+                          href="/dashboard/subscription"
+                          className="text-[10px] font-bold text-primary hover:underline"
+                        >
+                          Upgrade
+                        </Link>
+                      </div>
+                      <div className="flex items-center gap-2 bg-blue-50/50 p-2 rounded-lg border border-blue-100">
+                        <div className="bg-blue-100 p-1 rounded-md">
+                          <Zap className="w-3 h-3 text-blue-600 fill-blue-600" />
+                        </div>
+                        <span className="text-xs font-bold text-blue-700">
+                          Free Plan
+                        </span>
+                      </div>
+                    </div>
+                    <DropdownMenuSeparator className="bg-gray-100 mb-1" />
+                    <DropdownMenuItem
+                      className="rounded-lg cursor-pointer"
+                      onClick={() => router.push("/dashboard/settings")}
+                    >
+                      <User className="w-4 h-4 mr-2 text-gray-400" />
+                      Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-gray-100 my-1" />
+                    <DropdownMenuItem
+                      className="rounded-lg cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+                      onClick={handleLogout}
+                      disabled={isPending}
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      {isPending ? "Logging out..." : "Logout"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
           </div>
         </header>
 

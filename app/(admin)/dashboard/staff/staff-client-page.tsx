@@ -1,7 +1,5 @@
 "use client";
 
-export const runtime = "edge";
-
 import { cn } from "@/lib/utils";
 import {
   UserCog,
@@ -36,9 +34,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { usePermissions } from "@/lib/hooks/use-permissions";
 import { PermissionGuard } from "@/components/auth/permission-guard";
-import { redirect } from "next/navigation";
 
-export default function StaffPage() {
+export function StaffClientPage() {
   const [staff, setStaff] = useState<EventStaff[]>([]);
   const [staffToDelete, setStaffToDelete] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

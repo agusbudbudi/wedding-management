@@ -1,7 +1,5 @@
 "use client";
 
-export const runtime = "edge";
-
 import { useState, useEffect } from "react";
 import { Check, Sparkles, Zap, Shield, Crown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,7 +19,7 @@ import {
 } from "@/lib/services/subscription-service";
 import { toast } from "sonner";
 
-export default function SubscriptionPage() {
+export function SubscriptionClientPage() {
   const [subscription, setSubscription] = useState<UserSubscription | null>(
     null,
   );

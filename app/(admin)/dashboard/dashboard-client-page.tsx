@@ -1,7 +1,5 @@
 "use client";
 
-export const runtime = "edge";
-
 import { useState, useEffect, useMemo } from "react";
 import { supabaseGuestService } from "@/lib/services/guest-service";
 import { supabaseEventService } from "@/lib/services/event-service";
@@ -47,8 +45,19 @@ import { createClient } from "@/lib/supabase/client";
 import { exportService } from "@/lib/services/export-service";
 import { cn } from "@/lib/utils";
 import { ExportDropdown } from "@/components/features/export-dropdown";
-import { DashboardAnalytics } from "@/components/features/dashboard-analytics";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
+const DashboardAnalytics = dynamic(
+  () =>
+    import("@/components/features/dashboard-analytics").then(
+      (mod) => mod.DashboardAnalytics,
+    ),
+  { ssr: false },
+);
+import dynamic from "next/dynamic";
+
+const RSVPPieChart = dynamic(
+  () => import("@/components/features/charts/rsvp-pie-chart"),
+  { ssr: false },
+);
 import {
   Dialog,
   DialogContent,
@@ -91,7 +100,7 @@ const ICONS: Record<string, any> = {
   Flower2,
 };
 
-export default function DashboardPage() {
+export function DashboardClientPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeEvent, setActiveEvent] = useState<Event | null>(null);
@@ -547,35 +556,7 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="h-32 w-48 shrink-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={rsvpPieData}
-                          cx="42%"
-                          cy="50%"
-                          innerRadius={28}
-                          outerRadius={42}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {rsvpPieData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Legend
-                          verticalAlign="middle"
-                          align="right"
-                          layout="vertical"
-                          iconType="circle"
-                          iconSize={8}
-                          wrapperStyle={{
-                            fontSize: "10px",
-                            paddingLeft: "10px",
-                            lineHeight: "18px",
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <RSVPPieChart data={rsvpPieData} />
                   </div>
                 </div>
               </div>

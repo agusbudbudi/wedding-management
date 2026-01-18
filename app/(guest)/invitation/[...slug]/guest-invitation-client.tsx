@@ -1,20 +1,37 @@
 "use client";
 
 import { useRef } from "react";
-import { RSVPForm } from "@/components/features/rsvp-form";
+import dynamic from "next/dynamic";
 import { Separator } from "@/components/ui/separator";
 import { Sparkles } from "lucide-react";
 import { InvitationDisplay } from "@/components/features/invitation/invitation-display";
 
-import { WishesCarousel } from "@/components/features/invitation/wishes-carousel";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import QRCode from "react-qr-code";
 import { Gift, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { Guest } from "@/lib/types";
-import { toPng } from "html-to-image";
+// toPng will be dynamically imported
 import { Button } from "@/components/ui/button";
-import { PhotoUpload } from "@/components/features/invitation/photo-upload";
+
+const RSVPForm = dynamic(
+  () => import("@/components/features/rsvp-form").then((mod) => mod.RSVPForm),
+  { ssr: false },
+);
+const WishesCarousel = dynamic(
+  () =>
+    import("@/components/features/invitation/wishes-carousel").then(
+      (mod) => mod.WishesCarousel,
+    ),
+  { ssr: false },
+);
+const PhotoUpload = dynamic(
+  () =>
+    import("@/components/features/invitation/photo-upload").then(
+      (mod) => mod.PhotoUpload,
+    ),
+  { ssr: false },
+);
 
 interface GuestInvitationClientProps {
   guest: any;
@@ -69,6 +86,7 @@ export function GuestInvitationClient({
 
     try {
       setIsDownloading(true);
+      const { toPng } = await import("html-to-image");
       const dataUrl = await toPng(voucherRef.current, {
         cacheBust: true,
         backgroundColor: "#fff",

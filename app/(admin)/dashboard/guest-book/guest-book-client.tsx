@@ -26,8 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import Image from "next/image";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+// jspdf and jspdf-autotable will be dynamically imported during PDF generation
 import { supabaseNotificationService } from "@/lib/services/notification-service";
 import { usePermissions } from "@/lib/hooks/use-permissions";
 import { PermissionGuard } from "@/components/auth/permission-guard";
@@ -81,7 +80,7 @@ export function GuestBookClient() {
   };
 
   const filteredGuests = guests.filter((g) =>
-    g.name.toLowerCase().includes(searchQuery.toLowerCase())
+    g.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const toggleSelect = (id: string) => {
@@ -135,6 +134,10 @@ export function GuestBookClient() {
   };
 
   const generatePDF = async () => {
+    // Dynamically import jspdf and jspdf-autotable only when needed
+    const jsPDF = (await import("jspdf")).default;
+    await import("jspdf-autotable");
+
     const selectedGuests = guests.filter((g) => selectedIds.has(g.id));
     if (selectedGuests.length === 0) {
       toast.error("Please select at least one guest");
@@ -345,7 +348,7 @@ export function GuestBookClient() {
             card.width,
             card.height,
             undefined,
-            "FAST"
+            "FAST",
           );
           currentPageCards.push({
             ...card,
@@ -380,7 +383,7 @@ export function GuestBookClient() {
             card.width,
             card.height,
             undefined,
-            "FAST"
+            "FAST",
           );
           currentPageCards.push({
             ...card,
@@ -418,7 +421,7 @@ export function GuestBookClient() {
           card.width,
           card.height,
           undefined,
-          "FAST"
+          "FAST",
         );
         currentPageCards.push({
           ...card,
@@ -458,7 +461,7 @@ export function GuestBookClient() {
       result.doc.save(
         `guest-book-${
           activeEvent?.slug || "wedding"
-        }-${new Date().getTime()}.pdf`
+        }-${new Date().getTime()}.pdf`,
       );
       toast.success("PDF downloaded successfully");
 

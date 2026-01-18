@@ -1,7 +1,5 @@
 "use client";
 
-export const runtime = "edge";
-
 import { useEffect, useState } from "react";
 import {
   CheckCircle2,
@@ -18,7 +16,7 @@ import {
   UserSubscription,
 } from "@/lib/services/subscription-service";
 
-export default function SubscriptionSuccessPage() {
+export function SubscriptionSuccessClientPage() {
   const [subscription, setSubscription] = useState<UserSubscription | null>(
     null,
   );

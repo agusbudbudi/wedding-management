@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import ExcelJS from "exceljs";
+// ExcelJS will be dynamically imported
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -132,6 +132,7 @@ export function ImportGuestDialog({
         const eventSlug = event?.slug || "event";
 
         const data = e.target?.result as ArrayBuffer;
+        const ExcelJS = (await import("exceljs")).default;
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(data);
         const worksheet = workbook.worksheets[0];
