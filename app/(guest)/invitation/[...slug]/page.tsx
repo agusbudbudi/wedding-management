@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { supabaseInvitationService } from "@/lib/services/invitation-service";
 import { GuestInvitationClient } from "./guest-invitation-client";
 
+export const runtime = "edge";
+
 interface PageProps {
   params: Promise<{ slug: string[] }>;
 }
@@ -35,7 +37,7 @@ export default async function InvitationPage(props: PageProps) {
   // 2. Fetch Invitation
   const invitation = await supabaseInvitationService.getInvitationByEventId(
     guest.event_id,
-    supabase
+    supabase,
   );
 
   // 3. Get Template Defaults if none exists
@@ -93,11 +95,23 @@ export default async function InvitationPage(props: PageProps) {
     );
   }
 
+  // Fetch table information if guest exists
+  let table = null;
+  if (guest) {
+    const { data: tableData } = await supabase
+      .from("tables")
+      .select("*")
+      .contains("assigned_guest_ids", [guest.id])
+      .maybeSingle();
+    table = tableData;
+  }
+
   return (
     <GuestInvitationClient
       guest={guest}
       invitation={activeInvitation}
       wishes={wishesData || []}
+      table={table}
     />
   );
 }

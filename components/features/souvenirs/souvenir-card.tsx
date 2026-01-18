@@ -29,6 +29,7 @@ import {
   Flower2,
 } from "lucide-react";
 import Image from "next/image";
+import { PermissionGuard } from "@/components/auth/permission-guard";
 
 const ICONS: Record<string, any> = {
   Gift,
@@ -123,24 +124,28 @@ export function SouvenirCard({
 
       <CardFooter className="px-6 pb-0 pt-0">
         <div className="flex w-full items-center gap-2 border-t border-gray-50 pt-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex-1 rounded-xl text-gray-600 hover:text-blue-600 hover:bg-blue-50"
-            onClick={() => onEdit(souvenir)}
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Edit
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex-1 rounded-xl text-gray-600 hover:text-red-600 hover:bg-red-50"
-            onClick={() => onDelete(souvenir)}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete
-          </Button>
+          <PermissionGuard resource="souvenirs" action="edit">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 rounded-xl text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+              onClick={() => onEdit(souvenir)}
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+          </PermissionGuard>
+          <PermissionGuard resource="souvenirs" action="delete">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 rounded-xl text-gray-600 hover:text-red-600 hover:bg-red-50"
+              onClick={() => onDelete(souvenir)}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </Button>
+          </PermissionGuard>
         </div>
       </CardFooter>
     </Card>

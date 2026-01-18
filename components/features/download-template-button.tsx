@@ -2,24 +2,36 @@
 
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 export function DownloadTemplateButton() {
   const handleDownload = () => {
-    // 1. Define data
-    const headers = ["Guest Name", "Category", "Pax Count"];
-    const sampleRow = ["John Doe", "friend", 2];
+    // 1. Create workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Template");
 
-    // 2. Create worksheet
-    const wsData = [headers, sampleRow];
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    // 2. Define columns
+    worksheet.columns = [
+      { header: "Guest Name", key: "name", width: 30 },
+      { header: "Category", key: "category", width: 15 },
+      { header: "Pax Count", key: "pax", width: 10 },
+    ];
 
-    // 3. Create workbook and append sheet
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    // 3. Add sample row
+    worksheet.addRow({ name: "John Doe", category: "friend", pax: 2 });
 
     // 4. Generate download
-    XLSX.writeFile(wb, "guest_import_template.xlsx");
+    workbook.xlsx.writeBuffer().then((buffer) => {
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "guest_import_template.xlsx";
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    });
   };
 
   return (

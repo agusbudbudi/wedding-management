@@ -29,6 +29,8 @@ import Image from "next/image";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabaseNotificationService } from "@/lib/services/notification-service";
+import { usePermissions } from "@/lib/hooks/use-permissions";
+import { PermissionGuard } from "@/components/auth/permission-guard";
 
 export function GuestBookClient() {
   const [guests, setGuests] = useState<Guest[]>([]);
@@ -41,6 +43,7 @@ export function GuestBookClient() {
   const [activeEvent, setActiveEvent] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const { hasPermission } = usePermissions();
 
   useEffect(() => {
     fetchGuests();
@@ -491,7 +494,7 @@ export function GuestBookClient() {
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
             Guest Book
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-gray-500 mt-1 hidden md:block">
             View the list of guests who have uploaded photos and shared their
             wishes.
           </p>
@@ -510,19 +513,21 @@ export function GuestBookClient() {
             )}
             Preview
           </Button>
-          <Button
-            variant="default"
-            onClick={downloadPDF}
-            disabled={selectedIds.size === 0 || isGenerating}
-            className="rounded-xl font-bold bg-primary hover:bg-primary/90"
-          >
-            {isGenerating ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Download className="w-4 h-4 mr-2" />
-            )}
-            Download PDF ({selectedIds.size})
-          </Button>
+          <PermissionGuard resource="guest_book" action="download">
+            <Button
+              variant="default"
+              onClick={downloadPDF}
+              disabled={selectedIds.size === 0 || isGenerating}
+              className="rounded-xl font-bold bg-primary hover:bg-primary/90"
+            >
+              {isGenerating ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              Download PDF ({selectedIds.size})
+            </Button>
+          </PermissionGuard>
         </div>
       </div>
 
@@ -574,19 +579,21 @@ export function GuestBookClient() {
                   />
                 </div>
 
-                <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="w-8 h-8 rounded-lg shadow-lg"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteConfirmId(guest.id);
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+                <PermissionGuard resource="guest_book" action="delete">
+                  <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="w-8 h-8 rounded-lg shadow-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteConfirmId(guest.id);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </PermissionGuard>
 
                 {/* Photo Preview */}
                 <div className="aspect-[4/3] w-full relative overflow-hidden rounded-t-[1.4rem]">
@@ -664,10 +671,15 @@ export function GuestBookClient() {
                 Guest Book Photo Preview
               </DialogTitle>
               <div className="flex items-center gap-2 mr-8">
-                <Button onClick={downloadPDF} className="rounded-xl font-bold">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
+                {hasPermission("guest_book", "download") && (
+                  <Button
+                    onClick={downloadPDF}
+                    className="rounded-xl font-bold"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                )}
               </div>
             </div>
           </DialogHeader>

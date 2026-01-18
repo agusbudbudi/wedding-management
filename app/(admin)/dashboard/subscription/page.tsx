@@ -1,5 +1,7 @@
 "use client";
 
+export const runtime = "edge";
+
 import { useState, useEffect } from "react";
 import { Check, Sparkles, Zap, Shield, Crown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,7 +23,7 @@ import { toast } from "sonner";
 
 export default function SubscriptionPage() {
   const [subscription, setSubscription] = useState<UserSubscription | null>(
-    null
+    null,
   );
   const [loading, setLoading] = useState(true);
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export default function SubscriptionPage() {
     if (planName === "Enterprise") {
       const phoneNumber = "6285559496968";
       const message = encodeURIComponent(
-        "Halo Marinikah, saya tertarik dengan paket Enterprise. Boleh minta informasi lebih lanjut mengenai fitur dan harganya?"
+        "Halo Marinikah, saya tertarik dengan paket Enterprise. Boleh minta informasi lebih lanjut mengenai fitur dan harganya?",
       );
       window.open(`https://wa.me/${phoneNumber}?text=${message}`, "_blank");
       return;
@@ -273,8 +275,8 @@ export default function SubscriptionPage() {
                   pkg.current
                     ? "bg-gray-50 text-gray-400 hover:bg-gray-50 border-gray-100 cursor-not-allowed shadow-none"
                     : pkg.popular
-                    ? "bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/30 border-0"
-                    : "hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 border-gray-200 text-gray-700"
+                      ? "bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/30 border-0"
+                      : "hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 border-gray-200 text-gray-700"
                 }`}
                 disabled={pkg.current || processingPlan === pkg.name}
                 onClick={() => handleChoosePlan(pkg.name)}

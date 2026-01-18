@@ -18,9 +18,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Plus, Pencil, Trash2, Lock } from "lucide-react";
+import { Shield, Plus, Pencil, Trash2, Lock, User } from "lucide-react";
 import { toast } from "sonner";
 import { RoleDialog } from "./role-dialog";
+import { usePermissions } from "@/lib/hooks/use-permissions";
+import { PermissionGuard } from "@/components/auth/permission-guard";
 
 interface RolesPermissionsTabProps {
   eventId: string;
@@ -35,6 +37,7 @@ export function RolesPermissionsTab({ eventId }: RolesPermissionsTabProps) {
     null
   );
   const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
+  const { role, userId, hasPermission } = usePermissions();
 
   useEffect(() => {
     loadData();
@@ -122,25 +125,27 @@ export function RolesPermissionsTab({ eventId }: RolesPermissionsTabProps) {
           Create custom roles and assign specific permissions for your event
           team.
         </p>
-        <Button
-          onClick={() => {
-            setEditingRole(null);
-            setDialogOpen(true);
-          }}
-          className="bg-primary shadow-lg shadow-blue-500/30"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Create Role
-        </Button>
+        <PermissionGuard resource="staff" action="create_role">
+          <Button
+            onClick={() => {
+              setEditingRole(null);
+              setDialogOpen(true);
+            }}
+            className="bg-primary shadow-lg shadow-blue-500/30"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create Role
+          </Button>
+        </PermissionGuard>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {roles.map((role) => (
+        {roles.map((roleItem) => (
           <Card
-            key={role.id}
+            key={roleItem.id}
             className="group relative overflow-hidden rounded-[2rem] border-none shadow-[0_2px_40px_-12px_rgba(0,0,0,0.08)] hover:shadow-xl transition-all duration-300 bg-white"
           >
-            {role.is_system_role && (
+            {roleItem.is_system_role && (
               <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
                 <Lock className="w-24 h-24" />
               </div>
@@ -152,31 +157,31 @@ export function RolesPermissionsTab({ eventId }: RolesPermissionsTabProps) {
                 </div>
                 <Badge
                   className={`rounded-full px-4 py-1 font-bold text-[10px] uppercase tracking-wider ${
-                    role.is_system_role
+                    roleItem.is_system_role
                       ? "bg-purple-50 text-purple-700"
                       : "bg-blue-50 text-blue-700"
                   }`}
                 >
-                  {role.is_system_role ? "System Role" : "Custom Role"}
+                  {roleItem.is_system_role ? "System Role" : "Custom Role"}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <CardTitle className="text-xl font-bold text-gray-900">
-                  {role.name}
+                  {roleItem.name}
                 </CardTitle>
                 <CardDescription className="mt-1 text-gray-400 font-medium">
-                  {role.description || "No description"}
+                  {roleItem.description || "No description"}
                 </CardDescription>
               </div>
 
               <div className="space-y-2">
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                  Permissions ({role.permissions.length})
+                  Permissions ({roleItem.permissions.length})
                 </p>
                 <div className="flex flex-wrap gap-1">
-                  {role.permissions.slice(0, 3).map((perm) => (
+                  {roleItem.permissions.slice(0, 3).map((perm) => (
                     <Badge
                       key={perm.id}
                       variant="outline"
@@ -185,39 +190,71 @@ export function RolesPermissionsTab({ eventId }: RolesPermissionsTabProps) {
                       {perm.display_name}
                     </Badge>
                   ))}
-                  {role.permissions.length > 3 && (
+                  {roleItem.permissions.length > 3 && (
                     <Badge
                       variant="outline"
                       className="text-[10px] rounded-full"
                     >
-                      +{role.permissions.length - 3} more
+                      +{roleItem.permissions.length - 3} more
                     </Badge>
                   )}
                 </div>
               </div>
 
-              {!role.is_system_role && (
-                <div className="pt-4 flex items-center gap-2 border-t border-gray-50">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(role)}
-                    className="flex-1 rounded-xl text-gray-600 hover:text-blue-600 hover:bg-blue-50"
-                  >
-                    <Pencil className="w-4 h-4 mr-2" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(role.id, role.is_system_role)}
-                    className="flex-1 rounded-xl text-gray-600 hover:text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </Button>
+              {roleItem.creator_profile && (
+                <div className="pt-2 flex items-center gap-2 text-[10px] text-gray-400">
+                  <User className="w-3 h-3" />
+                  <span className="font-medium">
+                    Created by:{" "}
+                    {roleItem.creator_profile.full_name || "Unknown"} (
+                    {roleItem.creator_profile.email})
+                  </span>
                 </div>
               )}
+
+              {(() => {
+                const isSystemRole = roleItem.is_system_role;
+                const isOwner = role === "owner";
+                const isCreator = roleItem.created_by === userId;
+
+                // Only owner or creator can edit/delete
+                const canManageThisRole =
+                  isOwner || (isCreator && !isSystemRole);
+
+                if (isSystemRole || !canManageThisRole) return null;
+
+                const canEdit = hasPermission("staff", "edit_role");
+                const canDelete = hasPermission("staff", "delete_role");
+
+                if (!canEdit && !canDelete) return null;
+
+                return (
+                  <div className="pt-4 flex items-center gap-2 border-t border-gray-50">
+                    {canEdit && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(roleItem)}
+                        className="flex-1 rounded-xl text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+                      >
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Edit
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(roleItem.id, isSystemRole)}
+                        className="flex-1 rounded-xl text-gray-600 hover:text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         ))}

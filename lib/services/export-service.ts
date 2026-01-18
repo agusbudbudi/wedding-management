@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { Guest, Event } from "../types";
 import { RedeemedGuest } from "../types/souvenir";
 import { format } from "date-fns";
@@ -8,9 +8,25 @@ import autoTable from "jspdf-autotable";
 export const exportService = {
   exportGuestsToExcel(guests: Guest[], eventName: string) {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Guests");
 
-    const data = guests.map((guest) => {
-      // Extract performer name for export
+    // Define columns
+    worksheet.columns = [
+      { header: "Guest Name", key: "name", width: 30 },
+      { header: "Category", key: "category", width: 15 },
+      { header: "Pax", key: "pax", width: 8 },
+      { header: "Phone", key: "phone", width: 15 },
+      { header: "Status", key: "status", width: 15 },
+      { header: "Wishes", key: "wishes", width: 40 },
+      { header: "Last Action By", key: "lastActionBy", width: 30 },
+      { header: "Last Action At", key: "lastActionAt", width: 20 },
+      { header: "Invitation Link", key: "link", width: 50 },
+    ];
+
+    // Add data
+    guests.forEach((guest) => {
+      // Extract performer name
       const lastActionBy = (() => {
         if (!guest.last_log) return "-";
         if (guest.last_log.profile?.full_name)
@@ -29,51 +45,40 @@ export const exportService = {
         return "System";
       })();
 
-      return {
-        "Guest Name": guest.name,
-        Category: guest.category,
-        Pax: guest.pax_count,
-        Phone: guest.phone_number || "-",
-        Status: guest.status.replace("_", " ").toUpperCase(),
-        Wishes: guest.wishes || "-",
-        "Last Action By": lastActionBy,
-        "Last Action At": guest.updated_at
+      worksheet.addRow({
+        name: guest.name,
+        category: guest.category,
+        pax: guest.pax_count,
+        phone: guest.phone_number || "-",
+        status: guest.status.replace("_", " ").toUpperCase(),
+        wishes: guest.wishes || "-",
+        lastActionBy: lastActionBy,
+        lastActionAt: guest.updated_at
           ? format(new Date(guest.updated_at), "dd MMM yyyy, HH:mm")
           : "-",
-        "Invitation Link": `${baseUrl}/invitation/${guest.slug}`,
-      };
+        link: `${baseUrl}/invitation/${guest.slug}`,
+      });
     });
-
-    // Create worksheet
-    const worksheet = XLSX.utils.json_to_sheet(data);
-
-    // Create workbook
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Guests");
-
-    // Set column widths
-    const maxWidths = [
-      { wch: 30 }, // Name
-      { wch: 15 }, // Category
-      { wch: 8 }, // Pax
-      { wch: 15 }, // Phone
-      { wch: 15 }, // Status
-      { wch: 40 }, // Wishes
-      { wch: 30 }, // Action By
-      { wch: 20 }, // Action At
-      { wch: 50 }, // Link
-    ];
-    worksheet["!cols"] = maxWidths;
 
     // Generate filename
     const dateStr = format(new Date(), "yyyyMMdd_HHmm");
     const filename = `GuestList_${eventName.replace(
       /\s+/g,
-      "_"
+      "_",
     )}_${dateStr}.xlsx`;
 
-    // Download file
-    XLSX.writeFile(workbook, filename);
+    // Write and download
+    workbook.xlsx.writeBuffer().then((buffer) => {
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    });
   },
 
   exportSummaryToPDF(guests: Guest[], event: Event | null) {
@@ -91,7 +96,7 @@ export const exportService = {
       title: string,
       value: string,
       color: [number, number, number],
-      percentage?: number
+      percentage?: number,
     ) => {
       // Card Shadow/Border
       doc.setDrawColor(240, 240, 240);
@@ -177,18 +182,18 @@ export const exportService = {
           : "Not set"
       }`,
       100,
-      startYInfo + 7
+      startYInfo + 7,
     );
 
     // Statistics Grid
     const confirmed = guests.filter((g) =>
-      ["confirmed", "attended", "souvenir_delivered"].includes(g.status)
+      ["confirmed", "attended", "souvenir_delivered"].includes(g.status),
     ).length;
     const attended = guests.filter((g) =>
-      ["attended", "souvenir_delivered"].includes(g.status)
+      ["attended", "souvenir_delivered"].includes(g.status),
     ).length;
     const souvenirs = guests.filter(
-      (g) => g.status === "souvenir_delivered"
+      (g) => g.status === "souvenir_delivered",
     ).length;
     const totalPax = guests.reduce((sum, g) => sum + (g.pax_count || 0), 0);
 
@@ -204,7 +209,7 @@ export const exportService = {
       cardH,
       "Total Pax",
       totalPax.toString(),
-      [79, 70, 229]
+      [79, 70, 229],
     ); // Indigo
     drawCard(
       14 + cardW + gap,
@@ -214,7 +219,7 @@ export const exportService = {
       "RSVP Yes",
       confirmed.toString(),
       [16, 185, 129], // Emerald
-      guests.length > 0 ? (confirmed / guests.length) * 100 : 0
+      guests.length > 0 ? (confirmed / guests.length) * 100 : 0,
     );
     drawCard(
       14 + (cardW + gap) * 2,
@@ -224,7 +229,7 @@ export const exportService = {
       "Attended",
       attended.toString(),
       [59, 130, 246], // Blue
-      confirmed > 0 ? (attended / confirmed) * 100 : 0
+      confirmed > 0 ? (attended / confirmed) * 100 : 0,
     );
     drawCard(
       14 + (cardW + gap) * 3,
@@ -234,7 +239,7 @@ export const exportService = {
       "Souvenirs",
       souvenirs.toString(),
       [139, 92, 246], // Purple
-      attended > 0 ? (souvenirs / attended) * 100 : 0
+      attended > 0 ? (souvenirs / attended) * 100 : 0,
     );
 
     // Recent Activity Table
@@ -242,7 +247,7 @@ export const exportService = {
       .sort(
         (a, b) =>
           new Date(b.updated_at || 0).getTime() -
-          new Date(a.updated_at || 0).getTime()
+          new Date(a.updated_at || 0).getTime(),
       )
       .slice(0, 15);
 
@@ -287,51 +292,61 @@ export const exportService = {
         `Generated by Wedding Management System • Page ${i} of ${pageCount}`,
         105,
         285,
-        { align: "center" }
+        { align: "center" },
       );
     }
 
     const filename = `Summary_${eventName.replace(/\s+/g, "_")}_${format(
       new Date(),
-      "yyyyMMdd"
+      "yyyyMMdd",
     )}.pdf`;
     doc.save(filename);
   },
 
   exportRedeemedGuestsToExcel(redemptions: RedeemedGuest[], eventName: string) {
-    const data = redemptions.map((r) => ({
-      "Guest Name": r.name,
-      Category: r.category,
-      Souvenir: r.souvenir_name,
-      Quantity: r.souvenir_redeemed_quantity,
-      "Redeemed At": format(
-        new Date(r.souvenir_redeemed_at),
-        "dd MMM yyyy, HH:mm"
-      ),
-      "Redeemed By": r.redeemed_by_name,
-    }));
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Redemptions");
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Redemptions");
-
-    const maxWidths = [
-      { wch: 30 }, // Guest Name
-      { wch: 15 }, // Category
-      { wch: 25 }, // Souvenir
-      { wch: 10 }, // Quantity
-      { wch: 20 }, // Redeemed At
-      { wch: 25 }, // Redeemed By
+    worksheet.columns = [
+      { header: "Guest Name", key: "name", width: 30 },
+      { header: "Category", key: "category", width: 15 },
+      { header: "Souvenir", key: "souvenir", width: 25 },
+      { header: "Quantity", key: "quantity", width: 10 },
+      { header: "Redeemed At", key: "redeemedAt", width: 20 },
+      { header: "Redeemed By", key: "redeemedBy", width: 25 },
     ];
-    worksheet["!cols"] = maxWidths;
+
+    redemptions.forEach((r) => {
+      worksheet.addRow({
+        name: r.name,
+        category: r.category,
+        souvenir: r.souvenir_name,
+        quantity: r.souvenir_redeemed_quantity,
+        redeemedAt: format(
+          new Date(r.souvenir_redeemed_at),
+          "dd MMM yyyy, HH:mm",
+        ),
+        redeemedBy: r.redeemed_by_name,
+      });
+    });
 
     const dateStr = format(new Date(), "yyyyMMdd_HHmm");
     const filename = `SouvenirRedemptions_${eventName.replace(
       /\s+/g,
-      "_"
+      "_",
     )}_${dateStr}.xlsx`;
 
-    XLSX.writeFile(workbook, filename);
+    workbook.xlsx.writeBuffer().then((buffer) => {
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    });
   },
 
   exportRedeemedGuestsToPDF(redemptions: RedeemedGuest[], event: Event | null) {
@@ -358,7 +373,7 @@ export const exportService = {
     // Summary Section
     const totalRedeemed = redemptions.reduce(
       (sum, r) => sum + r.souvenir_redeemed_quantity,
-      0
+      0,
     );
     const uniqueGuests = new Set(redemptions.map((r) => r.id)).size;
 
@@ -415,13 +430,13 @@ export const exportService = {
         `Wedding Management System • Page ${i} of ${pageCount}`,
         105,
         285,
-        { align: "center" }
+        { align: "center" },
       );
     }
 
     const filename = `Redemptions_${eventName.replace(/\s+/g, "_")}_${format(
       new Date(),
-      "yyyyMMdd"
+      "yyyyMMdd",
     )}.pdf`;
     doc.save(filename);
   },

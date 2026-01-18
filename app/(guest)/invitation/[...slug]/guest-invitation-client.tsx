@@ -20,12 +20,14 @@ interface GuestInvitationClientProps {
   guest: any;
   invitation: any;
   wishes?: any[];
+  table?: any;
 }
 
 export function GuestInvitationClient({
   guest,
   invitation,
   wishes = [],
+  table,
 }: GuestInvitationClientProps) {
   const rsvpRef = useRef<HTMLDivElement>(null);
 
@@ -50,7 +52,7 @@ export function GuestInvitationClient({
         },
         (payload: any) => {
           setCurrentGuest(payload.new as Guest);
-        }
+        },
       )
       .subscribe();
 
@@ -177,6 +179,48 @@ export function GuestInvitationClient({
           </div>
         )}
 
+        {/* Seating Information Section */}
+        {(invitation.metadata as any)?.rsvp?.is_active !== false &&
+          (invitation.metadata as any)?.seating_info?.is_active === true &&
+          table && (
+            <>
+              <Separator className="bg-gray-100" />
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                <div className="text-center space-y-2">
+                  <h4 className="text-xl font-bold text-gray-900 tracking-tight italic font-serif">
+                    {(invitation.metadata as any)?.seating_info?.title ||
+                      "Informasi Tempat Duduk"}
+                  </h4>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                    {(invitation.metadata as any)?.seating_info?.subtitle ||
+                      "Silakan menempati meja yang telah disediakan"}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
+                  <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 text-center space-y-1">
+                    <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest">
+                      {(invitation.metadata as any)?.seating_info
+                        ?.table_name_label || "Nama Meja"}
+                    </p>
+                    <p className="text-lg font-serif font-black text-emerald-900 italic">
+                      {table.name}
+                    </p>
+                  </div>
+                  <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 text-center space-y-1">
+                    <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest">
+                      {(invitation.metadata as any)?.seating_info
+                        ?.table_shape_label || "Bentuk Meja"}
+                    </p>
+                    <p className="text-lg font-serif font-black text-emerald-900 italic capitalize">
+                      {table.shape}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
         {/* Wishes Carousel Section */}
         {(invitation.metadata as any)?.rsvp?.is_active !== false &&
           (invitation.metadata as any)?.wishes_section?.is_active !== false && (
@@ -202,34 +246,38 @@ export function GuestInvitationClient({
           )}
 
         {/* Guest Book Photo Section */}
-        {currentGuest.status === "attended" && (
-          <>
-            <Separator className="bg-gray-100" />
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-              <div className="text-center space-y-2">
-                <h4 className="text-xl font-bold text-gray-900 tracking-tight italic font-serif">
-                  Guest Book Photo
-                </h4>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                  Unggah momen manismu di acara ini
-                </p>
-              </div>
+        {currentGuest.status === "attended" &&
+          (invitation.metadata as any)?.guest_book?.is_active !== false && (
+            <>
+              <Separator className="bg-gray-100" />
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                <div className="text-center space-y-2">
+                  <h4 className="text-xl font-bold text-gray-900 tracking-tight italic font-serif">
+                    {(invitation.metadata as any)?.guest_book?.title ||
+                      "Guest Book Photo"}
+                  </h4>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                    {(invitation.metadata as any)?.guest_book?.subtitle ||
+                      "Unggah momen manismu di acara ini"}
+                  </p>
+                </div>
 
-              <PhotoUpload
-                guestId={currentGuest.id}
-                guestName={currentGuest.name}
-                initialPhotoUrl={currentGuest.photo_url}
-                onUploadSuccess={(url) => {
-                  setCurrentGuest((prev) => ({ ...prev, photo_url: url }));
-                }}
-              />
-            </div>
-          </>
-        )}
+                <PhotoUpload
+                  guestId={currentGuest.id}
+                  guestName={currentGuest.name}
+                  initialPhotoUrl={currentGuest.photo_url}
+                  onUploadSuccess={(url) => {
+                    setCurrentGuest((prev) => ({ ...prev, photo_url: url }));
+                  }}
+                />
+              </div>
+            </>
+          )}
 
         {/* Souvenir Redemption Section */}
         {(invitation.metadata as any)?.qr_invitation?.is_active !== false &&
           (invitation.metadata as any)?.rsvp?.is_active !== false &&
+          (invitation.metadata as any)?.redeem_souvenir?.is_active !== false &&
           (currentGuest.status === "attended" ||
             currentGuest.status === "souvenir_delivered") && (
             <>
@@ -237,10 +285,12 @@ export function GuestInvitationClient({
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
                 <div className="text-center space-y-2">
                   <h4 className="text-xl font-bold text-gray-900 tracking-tight italic font-serif">
-                    Pengambilan Souvenir
+                    {(invitation.metadata as any)?.redeem_souvenir?.title ||
+                      "Pengambilan Souvenir"}
                   </h4>
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                    Scan QR code ini di meja souvenir
+                    {(invitation.metadata as any)?.redeem_souvenir?.subtitle ||
+                      "Scan QR code ini di meja souvenir"}
                   </p>
                 </div>
 

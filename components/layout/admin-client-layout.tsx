@@ -6,12 +6,14 @@ import { signOut } from "@/lib/services/auth-actions";
 import {
   Search,
   Menu,
+  X,
   LogOut,
   Users,
   CalendarDays,
   Bell,
   Sparkles,
   Zap,
+  User,
 } from "lucide-react";
 import Link from "next/link";
 import { supabaseEventService } from "@/lib/services/event-service";
@@ -46,6 +48,7 @@ export function AdminClientLayout({ children, user }: AdminClientLayoutProps) {
   const [searchValue, setSearchValue] = useState(searchParams.get("q") || "");
   const [isPending, startTransition] = useTransition();
   const [activeEvent, setActiveEvent] = useState<Event | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const loadActiveEvent = async () => {
@@ -104,8 +107,69 @@ export function AdminClientLayout({ children, user }: AdminClientLayoutProps) {
     .slice(0, 2);
 
   return (
-    <div className="flex h-screen bg-[#F8F9FD]">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-[#F8F9FD] overflow-hidden">
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden transition-all duration-300 animate-in fade-in"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Mobile Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 w-72 bg-white z-50 md:hidden flex flex-col border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-in-out ${
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="px-6 py-4 flex items-center justify-between border-b border-gray-50">
+          <div className="flex items-center gap-3 text-primary">
+            <div className="bg-primary/10 p-2 rounded-xl">
+              <div className="w-6 h-6 bg-primary rounded-md transform rotate-45" />
+            </div>
+            <h1 className="text-xl font-bold tracking-tight text-gray-900">
+              Marinikah
+            </h1>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="rounded-full hover:bg-gray-100"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </Button>
+        </div>
+
+        <SidebarNav onItemClick={() => setIsMobileMenuOpen(false)} />
+
+        <div className="p-4 border-t border-gray-50">
+          <Link
+            href="/dashboard/subscription"
+            className="relative group block"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
+            <div className="relative bg-gradient-to-br from-blue-600 to-cyan-500 p-4 rounded-2xl text-white overflow-hidden">
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="bg-white/20 p-1 rounded-lg backdrop-blur-sm size-6">
+                    <Zap className="w-4 h-4 text-white fill-white" />
+                  </div>
+                  <h3 className="font-bold text-lg leading-tight">
+                    Upgrade to Pro
+                  </h3>
+                </div>
+                <p className="text-blue-50 text-xs leading-relaxed opacity-90">
+                  Unlock premium features to elevate your wedding.
+                </p>
+              </div>
+            </div>
+          </Link>
+        </div>
+      </aside>
+
+      {/* Desktop Sidebar */}
       <aside className="w-60 bg-white hidden md:flex flex-col border-r border-gray-100/50 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10">
         <div className="px-6 py-3">
           <div className="flex items-center gap-3 text-primary">
@@ -155,7 +219,12 @@ export function AdminClientLayout({ children, user }: AdminClientLayoutProps) {
         {/* Top Header */}
         <header className="bg-white/80 backdrop-blur-sm px-8 py-1 flex items-center justify-between border-b border-gray-100 sticky top-0 z-20">
           <div className="flex items-center gap-4 flex-1">
-            <Button variant="ghost" size="icon" className="md:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
               <Menu className="w-5 h-5" />
             </Button>
             {isGuestListPage && (
@@ -218,9 +287,9 @@ export function AdminClientLayout({ children, user }: AdminClientLayoutProps) {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-56 p-2 rounded-2xl shadow-xl shadow-gray-200/50 border-gray-100"
+                className="w-56 p-2 rounded-xl shadow-xl shadow-gray-200/50 border-gray-100"
               >
-                <div className="p-2 mb-2 bg-gray-50/50 rounded-xl">
+                <div className="p-2 mb-2 bg-gray-50/50 rounded-lg">
                   <p className="font-semibold text-sm text-gray-900">
                     {user.name}
                   </p>
@@ -248,14 +317,17 @@ export function AdminClientLayout({ children, user }: AdminClientLayoutProps) {
                     </span>
                   </div>
                 </div>
-                {/* <DropdownMenuSeparator /> */}
-                {/* <DropdownMenuItem className="rounded-xl cursor-pointer">
-                  <UserCog className="w-4 h-4 mr-2 text-gray-400" />
-                  Account Settings
-                </DropdownMenuItem> */}
+                <DropdownMenuSeparator className="bg-gray-100 mb-1" />
+                <DropdownMenuItem
+                  className="rounded-lg cursor-pointer"
+                  onClick={() => router.push("/dashboard/settings")}
+                >
+                  <User className="w-4 h-4 mr-2 text-gray-400" />
+                  Profile
+                </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-gray-100 my-1" />
                 <DropdownMenuItem
-                  className="rounded-xl cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+                  className="rounded-lg cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
                   onClick={handleLogout}
                   disabled={isPending}
                 >

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -80,7 +80,7 @@ export function ImportGuestDialog({
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<ImportedRow[] | null>(null);
   const [subscription, setSubscription] = useState<UserSubscription | null>(
-    null
+    null,
   );
   const [existingGuestCount, setExistingGuestCount] = useState(0);
   const [validationError, setValidationError] =
@@ -131,14 +131,24 @@ export function ImportGuestDialog({
         const event = await supabaseEventService.getEventById(eventId);
         const eventSlug = event?.slug || "event";
 
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const data = e.target?.result as ArrayBuffer;
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(data);
+        const worksheet = workbook.worksheets[0];
 
-        // Skip header row (index 0), start from index 1
-        const rows = jsonData.slice(1) as any[];
+        const rows: any[] = [];
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return; // Skip header
+          // Extract values (ExcelJS is 1-indexed)
+          // row.values is [ <empty>, col1, col2, ... ]
+          const rowValues = (row.values as any[]).slice(1);
+          // Alternatively navigate directly:
+          const name = row.getCell(1).text; // Use text to safely get string
+          const category = row.getCell(2).text;
+          const pax = row.getCell(3).value;
+
+          rows.push([name, category, pax]);
+        });
 
         // VALIDATION: Check if import would exceed subscription limit
         const guestLimit = subscription
@@ -181,7 +191,7 @@ export function ImportGuestDialog({
           else if (!categoryRaw) error = "Missing Category";
           else if (!VALID_CATEGORIES.includes(categoryRaw as GuestCategory)) {
             error = `Invalid Category (Must be: ${VALID_CATEGORIES.join(
-              ", "
+              ", ",
             )})`;
           } else if (!paxRaw || isNaN(parseInt(paxRaw)))
             error = "Invalid Pax Count";
@@ -217,9 +227,8 @@ export function ImportGuestDialog({
             // but for simplicity and safety against race conditions, we check per row.
             // A local cache 'usedSlugs' could optimize this loop for the current batch.
             while (!isUnique) {
-              const existing = await supabaseGuestService.getGuestBySlug(
-                candidateSlug
-              );
+              const existing =
+                await supabaseGuestService.getGuestBySlug(candidateSlug);
               if (!existing) {
                 isUnique = true;
               } else {
@@ -237,7 +246,7 @@ export function ImportGuestDialog({
                 slug: candidateSlug,
                 event_id: eventId,
               },
-              { action: "import" }
+              { action: "import" },
             );
 
             processedRows.push({
@@ -262,10 +271,10 @@ export function ImportGuestDialog({
         setResults(processedRows);
 
         const localSuccessCount = processedRows.filter(
-          (r) => r.status === "success"
+          (r) => r.status === "success",
         ).length;
         const localErrorCount = processedRows.filter(
-          (r) => r.status === "error"
+          (r) => r.status === "error",
         ).length;
 
         // Trigger system notification
@@ -530,7 +539,7 @@ export function ImportGuestDialog({
                                 "text-sm",
                                 row.error?.includes("Category")
                                   ? "text-red-600 font-bold"
-                                  : "text-gray-600"
+                                  : "text-gray-600",
                               )}
                             >
                               {row.category}
@@ -542,7 +551,7 @@ export function ImportGuestDialog({
                                 "text-sm",
                                 row.error?.includes("Pax")
                                   ? "text-red-600 font-bold"
-                                  : "text-gray-600"
+                                  : "text-gray-600",
                               )}
                             >
                               {row.pax_count}

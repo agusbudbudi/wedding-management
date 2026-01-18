@@ -11,7 +11,7 @@ import { usePermissions } from "@/lib/hooks/use-permissions";
 
 import { AddGuestDialog } from "./add-guest-dialog";
 
-import { Guest } from "@/lib/types";
+import { Guest, Event as WeddingEvent } from "@/lib/types";
 import { WhatsAppShareDialog } from "@/components/features/whatsapp-share/share-dialog";
 import {
   Table,
@@ -33,12 +33,13 @@ import {
   Edit,
   Trash2,
   ExternalLink,
-  ListFilter,
   ChevronLeft,
   ChevronRight,
   MoreHorizontal,
   AlertCircle,
   Loader2,
+  Filter,
+  ListFilter,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -51,10 +52,15 @@ import {
 
 interface GuestListProps {
   initialGuests: Guest[];
+  activeEvent?: WeddingEvent | null;
   onRefresh?: () => void;
 }
 
-export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
+export function GuestList({
+  initialGuests,
+  activeEvent,
+  onRefresh,
+}: GuestListProps) {
   const router = useRouter();
   const { hasPermission } = usePermissions();
   const searchParams = useSearchParams();
@@ -145,13 +151,16 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
                         size="icon"
                         className="h-6 w-6 relative"
                       >
-                        <ListFilter className="h-3.5 w-3.5" />
+                        <Filter className="h-3.5 w-3.5" />
                         {filterCategory && (
                           <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-blue-500 ring-2 ring-white" />
                         )}
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-[200px]">
+                    <DropdownMenuContent
+                      align="start"
+                      className="w-[200px] rounded-lg"
+                    >
                       <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       <DropdownMenuCheckboxItem
@@ -180,10 +189,10 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
                 </div>
               </TableHead>
               <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Pax
+                Invite Pax
               </TableHead>
               <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Attended Pax
+                Pax
               </TableHead>
               <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                 <div className="flex items-center gap-2">
@@ -195,13 +204,16 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
                         size="icon"
                         className="h-6 w-6 relative"
                       >
-                        <ListFilter className="h-3.5 w-3.5" />
+                        <Filter className="h-3.5 w-3.5" />
                         {filterStatus && (
                           <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-blue-500 ring-2 ring-white" />
                         )}
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-[200px]">
+                    <DropdownMenuContent
+                      align="start"
+                      className="w-[200px] rounded-lg"
+                    >
                       <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       <DropdownMenuCheckboxItem
@@ -367,6 +379,7 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
                     {canSendInvitation && (
                       <WhatsAppShareDialog
                         guest={guest}
+                        event={activeEvent || undefined}
                         onSuccess={onRefresh}
                         trigger={
                           <Button
@@ -432,7 +445,7 @@ export function GuestList({ initialGuests, onRefresh }: GuestListProps) {
                 >
                   <div className="flex flex-col items-center justify-center gap-2">
                     <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center">
-                      <ListFilter className="w-6 h-6 text-gray-300" />
+                      <Filter className="w-6 h-6 text-gray-300" />
                     </div>
                     <p>
                       {filterStatus || filterCategory || searchQuery

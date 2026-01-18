@@ -1,5 +1,7 @@
 "use client";
 
+export const runtime = "edge";
+
 import { useEffect, useState } from "react";
 import {
   CheckCircle2,
@@ -18,7 +20,7 @@ import {
 
 export default function SubscriptionSuccessPage() {
   const [subscription, setSubscription] = useState<UserSubscription | null>(
-    null
+    null,
   );
   const [loading, setLoading] = useState(true);
   const router = useRouter();

@@ -53,9 +53,14 @@ export function RoleDialog({
     } else {
       setName("");
       setDescription("");
-      setSelectedPermissions(new Set());
+      const mandatoryPerms = permissions.filter(
+        (p) =>
+          (p.resource === "events" && p.action === "view") ||
+          (p.resource === "dashboard" && p.action === "view")
+      );
+      setSelectedPermissions(new Set(mandatoryPerms.map((p) => p.id)));
     }
-  }, [role, open]);
+  }, [role, open, permissions]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,6 +97,13 @@ export function RoleDialog({
   };
 
   const togglePermission = (permissionId: string) => {
+    const perm = permissions.find((p) => p.id === permissionId);
+    if (
+      (perm?.resource === "events" && perm?.action === "view") ||
+      (perm?.resource === "dashboard" && perm?.action === "view")
+    )
+      return;
+
     const newSet = new Set(selectedPermissions);
     if (newSet.has(permissionId)) {
       newSet.delete(permissionId);
@@ -183,6 +195,10 @@ export function RoleDialog({
                             <Checkbox
                               id={`resource-${resource}`}
                               checked={allSelected}
+                              disabled={
+                                resource === "events" ||
+                                resource === "dashboard"
+                              }
                               onCheckedChange={() =>
                                 toggleAllInResource(resource)
                               }
@@ -208,6 +224,12 @@ export function RoleDialog({
                                 <Checkbox
                                   id={perm.id}
                                   checked={selectedPermissions.has(perm.id)}
+                                  disabled={
+                                    (perm.resource === "events" &&
+                                      perm.action === "view") ||
+                                    (perm.resource === "dashboard" &&
+                                      perm.action === "view")
+                                  }
                                   onCheckedChange={() =>
                                     togglePermission(perm.id)
                                   }

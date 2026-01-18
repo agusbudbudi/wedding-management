@@ -27,7 +27,7 @@ export const supabaseRoleService: RoleService = {
 
     const { data: roles, error: rolesError } = await supabase
       .from("roles")
-      .select("*")
+      .select("*, creator_profile:profiles!roles_created_by_fkey(*)")
       .eq("event_id", eventId)
       .order("is_system_role", { ascending: false })
       .order("name");
@@ -57,6 +57,9 @@ export const supabaseRoleService: RoleService = {
 
   async createRole(eventId: string, name: string, description?: string) {
     const supabase = createClient() as any;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     const { data, error } = await supabase
       .from("roles")
@@ -66,6 +69,7 @@ export const supabaseRoleService: RoleService = {
           name,
           description,
           is_system_role: false,
+          created_by: user?.id,
         },
       ])
       .select()

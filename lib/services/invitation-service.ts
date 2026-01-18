@@ -4,11 +4,11 @@ import { Invitation, InvitationTemplateType } from "@/lib/types";
 export interface InvitationService {
   getInvitationByEventId: (
     eventId: string,
-    supabaseClient?: any
+    supabaseClient?: any,
   ) => Promise<Invitation | null>;
   upsertInvitation: (
     invitation: Omit<Invitation, "id" | "created_at" | "updated_at">,
-    supabaseClient?: any
+    supabaseClient?: any,
   ) => Promise<Invitation>;
   getTemplates: () => Record<
     InvitationTemplateType,
@@ -34,7 +34,7 @@ export const supabaseInvitationService: InvitationService = {
 
   async upsertInvitation(
     invitation: Omit<Invitation, "id" | "created_at" | "updated_at">,
-    supabaseClient?: any
+    supabaseClient?: any,
   ) {
     const supabase = supabaseClient || (createClient() as any);
     const {
@@ -51,7 +51,7 @@ export const supabaseInvitationService: InvitationService = {
         },
         {
           onConflict: "event_id",
-        }
+        },
       )
       .select()
       .maybeSingle();
@@ -86,8 +86,14 @@ export const supabaseInvitationService: InvitationService = {
             no_option_label: "Maaf, saya tidak bisa hadir",
             no_response_message: "Doa terbaik untuk mempelai",
             subtitle: "Mohon konfirmasi kehadiran Anda di bawah ini",
-            show_wishes_input: true,
             wishes_input_title: "Ucapan & Doa",
+          },
+          seating_info: {
+            is_active: false,
+            title: "Informasi Tempat Duduk",
+            subtitle: "Silakan menempati meja yang telah disediakan",
+            table_name_label: "Nama Meja",
+            table_shape_label: "Bentuk Meja",
           },
           qr_invitation: {
             is_active: true,

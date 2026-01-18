@@ -1,5 +1,7 @@
 "use client";
 
+export const runtime = "edge";
+
 import { useState, useEffect } from "react";
 import {
   supabaseEventService,
@@ -42,7 +44,7 @@ import {
 export default function EventsPage() {
   const [events, setEvents] = useState<EventWithRole[]>([]);
   const [subscription, setSubscription] = useState<UserSubscription | null>(
-    null
+    null,
   );
   const [loading, setLoading] = useState(true);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
@@ -137,7 +139,7 @@ export default function EventsPage() {
             <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
               Events Management
             </h1>
-            <p className="text-gray-500 mt-1">
+            <p className="text-gray-500 mt-1 hidden md:block">
               Select or create an event to manage. Role-based access will apply
               automatically.
             </p>

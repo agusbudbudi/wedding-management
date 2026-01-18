@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Guest } from "@/lib/types";
+import { Guest, Event as WeddingEvent } from "@/lib/types";
 import { supabaseGuestService } from "@/lib/services/guest-service";
 import {
   Dialog,
@@ -18,25 +18,35 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Copy, Send, MessageCircle } from "lucide-react";
 
+import { format } from "date-fns";
+
 interface WhatsAppShareDialogProps {
   guest: Guest;
+  event?: WeddingEvent;
   trigger?: React.ReactNode;
   onSuccess?: () => void;
 }
 
 export function WhatsAppShareDialog({
   guest,
+  event,
   trigger,
   onSuccess,
 }: WhatsAppShareDialogProps) {
   const [open, setOpen] = useState(false);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-  const inviteLink = `${baseUrl}/invitation/${guest.slug}`;
+  const eventSlug = event?.slug || "wedding";
+  const inviteLink = `${baseUrl}/invitation/${eventSlug}/${guest.slug}`;
+
+  const eventName = event?.name || "our wedding";
+  const eventDate = event?.date
+    ? format(new Date(event.date), "EEEE, dd MMMM yyyy")
+    : "the scheduled date";
 
   const defaultTemplate = `Hi ${guest.name},
 
-You are invited to the wedding of Budi & Siti!
-Save the date: Sunday, 20 October 2025.
+You are invited to the wedding of ${eventName}!
+Save the date: ${eventDate}.
 
 Please confirm your attendance here:
 ${inviteLink}
@@ -44,6 +54,11 @@ ${inviteLink}
 We look forward to celebrating with you!`;
 
   const [message, setMessage] = useState(defaultTemplate);
+
+  // Update message when guest or event changes
+  useEffect(() => {
+    setMessage(defaultTemplate);
+  }, [guest.id, event?.id, defaultTemplate]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message);

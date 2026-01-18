@@ -8,14 +8,17 @@ import { authService } from "@/lib/services/auth-service";
 export function usePermissions() {
   const [role, setRole] = useState<string | null>(null);
   const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function checkPermissions() {
+      setLoading(true);
       const activeEventId = localStorage.getItem("active_event_id");
       if (!activeEventId) {
         setRole(null);
         setPermissions([]);
+        setUserId(null);
         setLoading(false);
         return;
       }
@@ -27,9 +30,12 @@ export function usePermissions() {
         if (!user) {
           setRole(null);
           setPermissions([]);
+          setUserId(null);
           setLoading(false);
           return;
         }
+
+        setUserId(user.id);
 
         // Check if user is owner
         const { data: events } = await supabase
@@ -78,6 +84,7 @@ export function usePermissions() {
         console.error("Error checking permissions:", error);
         setRole(null);
         setPermissions([]);
+        setUserId(null);
       } finally {
         setLoading(false);
       }
@@ -124,6 +131,8 @@ export function usePermissions() {
       Invitations: { resource: "invitations", action: "view" },
       "Staff Event": { resource: "staff", action: "view" },
       Settings: { resource: "events", action: "edit" },
+      Souvenirs: { resource: "souvenirs", action: "view" },
+      "Guest Book": { resource: "guest_book", action: "view" },
     };
 
     const permCheck = menuPermissionMap[menu];
@@ -132,5 +141,5 @@ export function usePermissions() {
     return hasPermission(permCheck.resource, permCheck.action);
   };
 
-  return { role, permissions, loading, canAccess, hasPermission };
+  return { role, permissions, userId, loading, canAccess, hasPermission };
 }

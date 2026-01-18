@@ -1,5 +1,7 @@
 "use client";
 
+export const runtime = "edge";
+
 import { useState, useEffect } from "react";
 import { supabaseGuestService } from "@/lib/services/guest-service";
 import { supabaseTableService } from "@/lib/services/table-service";
@@ -9,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
 import { AddTableDialog } from "@/components/features/seating/add-table-dialog";
+import { PermissionGuard } from "@/components/auth/permission-guard";
 
 export default function SeatingPage() {
   const [guests, setGuests] = useState<any[]>([]);
@@ -44,31 +47,33 @@ export default function SeatingPage() {
   const canAddTable = hasPermission("seating", "add_table");
 
   return (
-    <div className="space-y-6 h-full flex flex-col">
-      <div className="flex items-center justify-between flex-shrink-0">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Seating Management
-          </h1>
-          <p className="text-gray-500">
-            Drag and drop guests into tables or assign tables from the guest
-            card.
-          </p>
+    <PermissionGuard resource="seating" action="view" redirectTo="/restricted">
+      <div className="space-y-6 h-full flex flex-col">
+        <div className="flex items-center justify-between flex-shrink-0">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Seating Management
+            </h1>
+            <p className="text-gray-500 hidden md:block">
+              Drag and drop guests into tables or assign tables from the guest
+              card.
+            </p>
+          </div>
+
+          {canAddTable && (
+            <AddTableDialog
+              eventId={activeEventId || ""}
+              onSuccess={() => loadData(activeEventId || undefined)}
+            />
+          )}
         </div>
 
-        {canAddTable && (
-          <AddTableDialog
-            eventId={activeEventId || ""}
-            onSuccess={() => loadData(activeEventId || undefined)}
-          />
-        )}
+        <SeatingBoard
+          initialGuests={guests}
+          initialTables={tables}
+          onRefresh={() => loadData(activeEventId || undefined)}
+        />
       </div>
-
-      <SeatingBoard
-        initialGuests={guests}
-        initialTables={tables}
-        onRefresh={() => loadData(activeEventId || undefined)}
-      />
-    </div>
+    </PermissionGuard>
   );
 }

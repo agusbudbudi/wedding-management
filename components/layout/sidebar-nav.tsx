@@ -17,7 +17,7 @@ import {
   Gift,
 } from "lucide-react";
 
-export function SidebarNav() {
+export function SidebarNav({ onItemClick }: { onItemClick?: () => void }) {
   const pathname = usePathname();
   const { canAccess, loading } = usePermissions();
 
@@ -99,6 +99,7 @@ export function SidebarNav() {
                 icon={item.icon}
                 label={item.label}
                 active={isActive(item.href)}
+                onClick={onItemClick}
               />
             ))}
           </div>
@@ -113,15 +114,18 @@ function NavItem({
   icon: Icon,
   label,
   active,
+  onClick,
 }: {
   href: string;
   icon: any;
   label: string;
   active?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <Link
       href={href}
+      onClick={onClick}
       className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group ${
         active
           ? "bg-primary text-white shadow-lg shadow-blue-500/30"

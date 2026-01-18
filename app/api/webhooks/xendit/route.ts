@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+
 import { createClient } from "@/lib/supabase/server";
 import { xenditService } from "@/lib/services/xendit-service";
 
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
       console.error("Update payment record error:", updateError);
       return NextResponse.json(
         { error: "Payment record not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
         console.error("Update subscription error:", subError);
         return NextResponse.json(
           { error: "Failed to update subscription" },
-          { status: 500 }
+          { status: 500 },
         );
       }
     }

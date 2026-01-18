@@ -195,16 +195,18 @@ function DraggableTableGuest({
             ? guest.attended_pax || guest.pax_count
             : guest.pax_count}
         </span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onAssign(guest.id, "unassigned");
-          }}
-          className="p-1 rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition-all focus:outline-none focus:ring-2 focus:ring-red-100 cursor-pointer"
-          title="Unassign"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
+        {canEdit && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAssign(guest.id, "unassigned");
+            }}
+            className="p-1 rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition-all focus:outline-none focus:ring-2 focus:ring-red-100 cursor-pointer"
+            title="Unassign"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -355,6 +357,7 @@ export function SeatingBoard({
 
   const canEdit = hasPermission("seating", "edit");
   const canDeleteTable = hasPermission("seating", "delete_table");
+  const canEditTable = hasPermission("seating", "edit_table");
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -558,7 +561,7 @@ export function SeatingBoard({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                       align="end"
-                      className="w-56 rounded-2xl p-2 shadow-2xl border-gray-100 animate-in fade-in zoom-in-95 duration-200"
+                      className="w-56 rounded-lg p-2 shadow-2xl border-gray-100 animate-in fade-in zoom-in-95 duration-200"
                     >
                       <div className="px-3 py-2">
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
@@ -778,28 +781,32 @@ export function SeatingBoard({
                               >
                                 {currentPax} / {table.capacity}
                               </Badge>
-                              {canDeleteTable && (
+                              {(canEditTable || canDeleteTable) && (
                                 <div className="flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                                    onClick={() => setEditingTable(table)}
-                                    title="Edit Table"
-                                  >
-                                    <Pencil className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                                    onClick={() => {
-                                      setDeleteConfirmId(table.id);
-                                    }}
-                                    title="Delete Table"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
+                                  {canEditTable && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                      onClick={() => setEditingTable(table)}
+                                      title="Edit Table"
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                  {canDeleteTable && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                      onClick={() => {
+                                        setDeleteConfirmId(table.id);
+                                      }}
+                                      title="Delete Table"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
                                 </div>
                               )}
                             </div>

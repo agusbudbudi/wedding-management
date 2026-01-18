@@ -102,6 +102,13 @@ export interface WeddingMetadata {
     show_wishes_input?: boolean;
     wishes_input_title?: string;
   };
+  seating_info?: {
+    is_active: boolean;
+    title: string;
+    subtitle?: string;
+    table_name_label?: string;
+    table_shape_label?: string;
+  };
   qr_invitation?: {
     is_active: boolean;
   };
@@ -153,6 +160,8 @@ export interface Role {
   name: string;
   description?: string;
   is_system_role: boolean;
+  created_by?: string;
+  creator_profile?: Profile;
   created_at?: string;
   updated_at?: string;
 }
