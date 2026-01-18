@@ -3,19 +3,7 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat", "nodejs_als"]
 pages_build_output_dir = ".vercel/output/static"
 
-# Node.js compatibility untuk packages berat
-node_compat = true
-
-# Public environment variables (non-sensitive)
 [vars]
-# Akan di-set via Cloudflare Dashboard
-```
-
----
-
-### **File 3: `.npmrc` (BUAT BARU di root project)**
-
-Optimize npm install untuk production:
-```
-legacy-peer-deps=true
-engine-strict=false
+# Public environment variables (non-sensitive)
+# Note: Sensitive variables like SUPABASE_ANON_KEY should be set via Cloudflare Dashboard
+NEXT_PUBLIC_SUPABASE_URL = "https://qtsgglzoyzjcvfuaxxmb.supabase.co"
