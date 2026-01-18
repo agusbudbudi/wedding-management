@@ -1,5 +1,7 @@
 "use client";
 
+export const runtime = "edge";
+
 import { useState, useEffect, useMemo } from "react";
 import { supabaseGuestService } from "@/lib/services/guest-service";
 import { supabaseEventService } from "@/lib/services/event-service";

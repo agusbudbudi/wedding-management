@@ -1,9 +1,3 @@
-import { Xendit } from "xendit-node";
-
-const xenditClient = new Xendit({
-  secretKey: process.env.XENDIT_SECRET_KEY || "",
-});
-
 export const xenditService = {
   async createInvoice(params: {
     externalId: string;
@@ -13,7 +7,8 @@ export const xenditService = {
     items?: any[];
     baseUrl?: string;
   }) {
-    if (!process.env.XENDIT_SECRET_KEY) {
+    const secretKey = process.env.XENDIT_SECRET_KEY;
+    if (!secretKey) {
       throw new Error("XENDIT_SECRET_KEY is not defined");
     }
 
@@ -21,24 +16,37 @@ export const xenditService = {
 
     if (!baseUrl) {
       throw new Error(
-        "Base application URL is not defined. Please check NEXT_PUBLIC_APP_URL in .env.local"
+        "Base application URL is not defined. Please check NEXT_PUBLIC_APP_URL in .env.local",
       );
     }
 
     try {
-      const response = await (xenditClient.Invoice as any).createInvoice({
-        data: {
-          externalId: params.externalId,
+      const auth = btoa(`${secretKey}:`);
+      const response = await fetch("https://api.xendit.co/v2/invoices", {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${auth}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          external_id: params.externalId,
           amount: params.amount,
-          payerEmail: params.payerEmail,
+          payer_email: params.payerEmail,
           description: params.description,
           items: params.items,
           currency: "IDR",
-          successRedirectUrl: `${baseUrl}/dashboard/subscription/success`,
-          failureRedirectUrl: `${baseUrl}/dashboard/subscription`,
-        },
+          success_redirect_url: `${baseUrl}/dashboard/subscription/success`,
+          failure_redirect_url: `${baseUrl}/dashboard/subscription`,
+        }),
       });
-      return response;
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to create invoice");
+      }
+
+      const data = await response.json();
+      return data;
     } catch (error: any) {
       console.error("Xendit createInvoice error:", error);
       throw error;
@@ -46,11 +54,31 @@ export const xenditService = {
   },
 
   async getInvoice(invoiceId: string) {
+    const secretKey = process.env.XENDIT_SECRET_KEY;
+    if (!secretKey) {
+      throw new Error("XENDIT_SECRET_KEY is not defined");
+    }
+
     try {
-      const response = await (xenditClient.Invoice as any).getInvoice({
-        invoiceId,
-      });
-      return response;
+      const auth = btoa(`${secretKey}:`);
+      const response = await fetch(
+        `https://api.xendit.co/v2/invoices/${invoiceId}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Basic ${auth}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to get invoice");
+      }
+
+      const data = await response.json();
+      return data;
     } catch (error: any) {
       console.error("Xendit getInvoice error:", error);
       throw error;

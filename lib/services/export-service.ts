@@ -1,12 +1,10 @@
-import ExcelJS from "exceljs";
 import { Guest, Event } from "../types";
 import { RedeemedGuest } from "../types/souvenir";
 import { format } from "date-fns";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 export const exportService = {
-  exportGuestsToExcel(guests: Guest[], eventName: string) {
+  async exportGuestsToExcel(guests: Guest[], eventName: string) {
+    const ExcelJS = (await import("exceljs")).default;
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Guests");
@@ -81,7 +79,10 @@ export const exportService = {
     });
   },
 
-  exportSummaryToPDF(guests: Guest[], event: Event | null) {
+  async exportSummaryToPDF(guests: Guest[], event: Event | null) {
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
+
     const doc = new jsPDF();
     const eventName = event?.name || "Wedding Event";
     const dateStr = format(new Date(), "dd MMMM yyyy");
@@ -303,7 +304,11 @@ export const exportService = {
     doc.save(filename);
   },
 
-  exportRedeemedGuestsToExcel(redemptions: RedeemedGuest[], eventName: string) {
+  async exportRedeemedGuestsToExcel(
+    redemptions: RedeemedGuest[],
+    eventName: string,
+  ) {
+    const ExcelJS = (await import("exceljs")).default;
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Redemptions");
 
@@ -349,7 +354,13 @@ export const exportService = {
     });
   },
 
-  exportRedeemedGuestsToPDF(redemptions: RedeemedGuest[], event: Event | null) {
+  async exportRedeemedGuestsToPDF(
+    redemptions: RedeemedGuest[],
+    event: Event | null,
+  ) {
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
+
     const doc = new jsPDF();
     const eventName = event?.name || "Wedding Event";
     const dateStr = format(new Date(), "dd MMMM yyyy");
