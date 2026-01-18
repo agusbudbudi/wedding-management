@@ -1,7 +1,7 @@
 name = "wedding-management"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat", "nodejs_als"]
-pages_build_output_dir = ".vercel/output/static"
+pages_build_output_dir = ".vercel/output"
 
 [vars]
 # Public environment variables (non-sensitive)

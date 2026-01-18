@@ -1,5 +1,7 @@
 "use client";
 
+export const runtime = "edge";
+
 import { useTransition } from "react";
 import { updatePassword } from "@/lib/services/auth-actions";
 import { Button } from "@/components/ui/button";

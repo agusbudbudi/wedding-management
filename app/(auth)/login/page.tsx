@@ -1,5 +1,7 @@
 "use client";
 
+export const runtime = "edge";
+
 import { useTransition } from "react";
 import Link from "next/link";
 import { login } from "@/lib/services/auth-actions";

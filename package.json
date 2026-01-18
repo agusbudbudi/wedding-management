@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "pages:build": "npx @cloudflare/next-on-pages",
-    "pages:deploy": "npm run pages:build && npx wrangler pages deploy .vercel/output/static --project-name=wedding-management",
+    "pages:deploy": "npm run pages:build && npx wrangler pages deploy .vercel/output --project-name=wedding-management",
     "pages:dev": "npx @cloudflare/next-on-pages --watch"
   },
   "dependencies": {

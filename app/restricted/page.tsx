@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/button";
 import { ShieldAlert } from "lucide-react";
 import Link from "next/link";
 
+export const runtime = "edge";
+
 export default function RestrictedPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 text-center">
